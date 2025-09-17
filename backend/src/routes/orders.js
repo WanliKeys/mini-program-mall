@@ -74,7 +74,7 @@ router.get('/', asyncHandler(async (req, res) => {
                          '"id":', oi.product_id,
                          ',"name":"', oi.product_name, '"',
                          ',"image":"', oi.product_image, '"',
-                         ',"price":', oi.price,
+                         ',"price":', oi.product_price,
                          ',"quantity":', oi.quantity,
                   '}')
                 ) AS items_json
@@ -87,7 +87,7 @@ router.get('/', asyncHandler(async (req, res) => {
       [...params, parseInt(pageSize), offset]
     );
     
-    const [countResult] = await query(
+    const countRows = await query(
       `SELECT COUNT(DISTINCT o.id) as total FROM orders o ${whereClause}`,
       params
     );
@@ -109,8 +109,8 @@ router.get('/', asyncHandler(async (req, res) => {
     
     success(res, {
       orders: processedOrders,
-      total: countResult[0].total,
-      hasMore: offset + processedOrders.length < countResult[0].total
+      total: countRows[0]?.total || 0,
+      hasMore: offset + processedOrders.length < (countRows[0]?.total || 0)
     }, '获取订单列表成功');
     
   } catch (err) {
@@ -126,7 +126,7 @@ router.get('/', asyncHandler(async (req, res) => {
 router.post('/', asyncHandler(async (req, res) => {
   try {
     const userId = req.user.id;
-    const { productId, quantity = 1, addressId, externalOrderNo } = req.body;
+    const { productId, quantity = 1, addressId, externalOrderNo, remark, paymentMethod = 'wechat' } = req.body;
     
     // 验证参数
     if (!productId || !addressId) {
@@ -169,7 +169,7 @@ router.post('/', asyncHandler(async (req, res) => {
     if (externalOrderNo) {
       // 来自引流平台，直接使用外部订单号
       orderNo = externalOrderNo;
-      source = 'referral';
+      source = 'external';
     } else {
       // 内部订单，生成新订单号
       orderNo = 'ML' + moment().format('YYYYMMDDHHmmss') + Math.random().toString(36).substr(2, 4).toUpperCase();
@@ -180,28 +180,30 @@ router.post('/', asyncHandler(async (req, res) => {
     // 创建订单
     const orderResult = await query(
       `INSERT INTO orders (
-        order_no, user_id, total_amount, status, source,
-        receiver_name, receiver_phone, receiver_address,
+        order_no, user_id, address_id, total_amount, payment_method, status, remark, external_order_no, source,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
-        orderNo, userId, totalAmount, 'pending', source,
-        address.name, address.phone, 
-        `${address.province} ${address.city} ${address.district} ${address.detail}`
+        orderNo, userId, addressId, totalAmount, paymentMethod, 'pending', remark || null,
+        externalOrderNo || null, source
       ]
     );
     
-    const orderId = orderResult[0].insertId;
+    // mysql2/promise execute 返回的是 rows; 对 INSERT 返回 OkPacket
+    const orderId = orderResult.insertId || (Array.isArray(orderResult) ? orderResult[0]?.insertId : undefined);
+    if (!orderId) {
+      throw new Error('创建订单失败：未获取到插入ID');
+    }
     
     // 创建订单项
     await query(
       `INSERT INTO order_items (
-        order_id, product_id, product_name, product_image, 
-        price, quantity, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+        order_id, product_id, product_name, product_image,
+        product_price, quantity, subtotal, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         orderId, product.id, product.name, product.image,
-        product.price, quantity
+        product.price, quantity, parseFloat(product.price) * quantity
       ]
     );
     
@@ -211,14 +213,13 @@ router.post('/', asyncHandler(async (req, res) => {
       [quantity, quantity, productId]
     );
     
-    // 记录引流日志
+    // 记录引流日志（按当前表结构）
     if (externalOrderNo) {
       await query(
         `INSERT INTO referral_logs (
-          external_order_no, internal_order_id, user_id, 
-          product_id, action, created_at
-        ) VALUES (?, ?, ?, ?, 'purchase', NOW())`,
-        [externalOrderNo, orderId, userId, productId]
+          user_id, external_order_no, source_platform, product_id, action_type, created_at
+        ) VALUES (?, ?, 'external', ?, 'order', NOW())`,
+        [userId, externalOrderNo, productId]
       );
     }
     
@@ -229,16 +230,13 @@ router.post('/', asyncHandler(async (req, res) => {
       totalAmount,
       status: 'pending',
       source,
-      receiverInfo: {
-        name: address.name,
-        phone: address.phone,
-        address: `${address.province} ${address.city} ${address.district} ${address.detail}`
-      },
       items: [{
-        productId: product.id,
-        name: product.name,
-        image: product.image,
-        price: parseFloat(product.price),
+        product: {
+          id: product.id,
+          name: product.name,
+          image: product.image,
+          price: parseFloat(product.price)
+        },
         quantity
       }],
       createdAt: moment().format('YYYY-MM-DD HH:mm:ss')
@@ -324,7 +322,10 @@ router.post('/batch', asyncHandler(async (req, res) => {
       ]
     );
     
-    const orderId = orderResult[0].insertId;
+    const orderId = orderResult.insertId || (Array.isArray(orderResult) ? orderResult[0]?.insertId : undefined);
+    if (!orderId) {
+      throw new Error('创建订单失败：未获取到插入ID');
+    }
     
     // 创建订单项并更新库存
     for (const item of validItems) {
@@ -458,7 +459,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
 
     // 查询订单项
     const items = await query(
-      `SELECT oi.id, oi.product_id, oi.product_name, oi.product_image, oi.price, oi.quantity,
+      `SELECT oi.id, oi.product_id, oi.product_name, oi.product_image, oi.product_price, oi.quantity,
               p.id as p_id, p.name as p_name, p.image as p_image, p.price as p_price
        FROM order_items oi
        LEFT JOIN products p ON p.id = oi.product_id
@@ -473,7 +474,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
         id: it.product_id || it.p_id,
         name: it.product_name || it.p_name,
         image: it.product_image || it.p_image,
-        price: parseFloat(it.price || it.p_price)
+        price: parseFloat(it.product_price || it.p_price)
       }
     }));
 

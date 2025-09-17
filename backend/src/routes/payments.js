@@ -22,7 +22,7 @@ router.post('/pay', asyncHandler(async (req, res) => {
     const { orderId, paymentMethod = 'wechat' } = req.body;
     
     // 验证订单
-    const [orders] = await query(
+    const orders = await query(
       'SELECT * FROM orders WHERE id = ? AND user_id = ? AND status = ?',
       [orderId, userId, 'pending']
     );
@@ -39,13 +39,16 @@ router.post('/pay', asyncHandler(async (req, res) => {
     // 创建支付记录
     const paymentResult = await query(
       `INSERT INTO payments (
-        payment_no, order_id, user_id, amount, payment_method, 
+        payment_no, order_id, amount, payment_method, 
         status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-      [paymentNo, orderId, userId, order.total_amount, paymentMethod, 'pending']
+      ) VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+      [paymentNo, orderId, order.total_amount, paymentMethod, 'pending']
     );
     
-    const paymentId = paymentResult[0].insertId;
+    const paymentId = paymentResult.insertId || (Array.isArray(paymentResult) ? paymentResult[0]?.insertId : undefined);
+    if (!paymentId) {
+      throw new Error('创建支付记录失败：未获取到插入ID');
+    }
     
     let paymentData = {};
     
@@ -55,7 +58,7 @@ router.post('/pay', asyncHandler(async (req, res) => {
         const wechatPay = new WeChatPay();
         
         // 获取用户openid（从用户表中获取）
-        const [users] = await query('SELECT openid FROM users WHERE id = ?', [userId]);
+        const users = await query('SELECT openid FROM users WHERE id = ?', [userId]);
         const userOpenid = users.length > 0 ? users[0].openid : null;
         
         if (!userOpenid && process.env.NODE_ENV === 'production') {
@@ -100,42 +103,7 @@ router.post('/pay', asyncHandler(async (req, res) => {
       }
       
     } else if (paymentMethod === 'alipay') {
-      // 支付宝支付
-      try {
-        const alipay = new AliPay();
-        
-        // 获取用户支付宝ID（如果有的话）
-        const [users] = await query('SELECT alipay_user_id FROM users WHERE id = ?', [userId]);
-        const alipayUserId = users.length > 0 ? users[0].alipay_user_id : null;
-        
-        const orderWithUserId = { ...order, user_openid: alipayUserId };
-        const alipayData = await alipay.createOrder(orderWithUserId, paymentNo);
-        
-        paymentData = {
-          paymentId,
-          paymentNo,
-          paymentMethod: 'alipay',
-          orderInfo: alipayData.order_info,
-          tradeNo: alipayData.trade_no
-        };
-        
-      } catch (err) {
-        console.error('支付宝支付创建失败:', err);
-        
-        // 开发环境下返回模拟数据
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🔧 开发环境：使用支付宝模拟数据');
-          paymentData = {
-            paymentId,
-            paymentNo,
-            paymentMethod: 'alipay',
-            orderInfo: 'mock_order_info_' + Date.now(),
-            tradeNo: 'mock_trade_no_' + Date.now()
-          };
-        } else {
-          throw err;
-        }
-      }
+      return error(res, '当前小程序不支持支付宝支付', 400);
     } else {
       return error(res, '不支持的支付方式', 400);
     }
