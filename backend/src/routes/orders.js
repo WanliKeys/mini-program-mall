@@ -42,59 +42,7 @@ router.get('/stats', asyncHandler(async (req, res) => {
   }
 }));
 
-/**
- * 获取最近订单
- * GET /api/orders/recent
- */
-router.get('/recent', asyncHandler(async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { limit = 3 } = req.query;
-    
-    const orders = await query(
-      `SELECT o.*, 
-       GROUP_CONCAT(
-         CONCAT('{"id":', oi.product_id, ',"name":"', oi.product_name, '","image":"', oi.product_image, '","price":', oi.price, ',"quantity":', oi.quantity, '}')
-       ) as items
-       FROM orders o 
-       LEFT JOIN order_items oi ON o.id = oi.order_id 
-       WHERE o.user_id = ? 
-       GROUP BY o.id 
-       ORDER BY o.created_at DESC 
-       LIMIT ?`,
-      [userId, parseInt(limit)]
-    );
-    
-    const processedOrders = orders.map(order => ({
-      ...order,
-      items: order.items ? order.items.split(',').map(item => JSON.parse(item)) : []
-    }));
-    
-    success(res, processedOrders, '获取最近订单成功');
-    
-  } catch (err) {
-    console.error('获取最近订单失败:', err);
-    // 返回模拟数据
-    success(res, [
-      {
-        id: 1,
-        orderNo: 'ML20250916001',
-        status: 'pending',
-        totalAmount: 9999.00,
-        createdAt: moment().format('YYYY-MM-DD HH:mm:ss'),
-        items: [
-          {
-            id: 1,
-            name: 'iPhone 15 Pro Max 512GB',
-            image: '/uploads/images/products/iphone.jpg',
-            price: 9999.00,
-            quantity: 1
-          }
-        ]
-      }
-    ], '获取最近订单成功');
-  }
-}));
+// 最近订单功能已下线，相关接口已移除
 
 /**
  * 获取订单列表
@@ -115,16 +63,25 @@ router.get('/', asyncHandler(async (req, res) => {
     
     const offset = (page - 1) * pageSize;
     
+    // 使用子查询聚合订单项，避免 ONLY_FULL_GROUP_BY 问题
     const orders = await query(
-      `SELECT o.*, 
-       COUNT(oi.id) as itemCount,
-       GROUP_CONCAT(
-         CONCAT('{"id":', oi.product_id, ',"name":"', oi.product_name, '","image":"', oi.product_image, '","price":', oi.price, ',"quantity":', oi.quantity, '}')
-       ) as items
-       FROM orders o 
-       LEFT JOIN order_items oi ON o.id = oi.order_id 
+      `SELECT o.*, items.items_json AS items
+       FROM orders o
+       LEFT JOIN (
+         SELECT oi.order_id, 
+                GROUP_CONCAT(
+                  CONCAT('{',
+                         '"id":', oi.product_id,
+                         ',"name":"', oi.product_name, '"',
+                         ',"image":"', oi.product_image, '"',
+                         ',"price":', oi.price,
+                         ',"quantity":', oi.quantity,
+                  '}')
+                ) AS items_json
+         FROM order_items oi
+         GROUP BY oi.order_id
+       ) items ON items.order_id = o.id
        ${whereClause}
-       GROUP BY o.id 
        ORDER BY o.created_at DESC 
        LIMIT ? OFFSET ?`,
       [...params, parseInt(pageSize), offset]
@@ -135,10 +92,20 @@ router.get('/', asyncHandler(async (req, res) => {
       params
     );
     
-    const processedOrders = orders.map(order => ({
-      ...order,
-      items: order.items ? order.items.split(',').map(item => JSON.parse(item)) : []
-    }));
+    const processedOrders = orders.map(order => {
+      let parsedItems = [];
+      if (order.items && typeof order.items === 'string' && order.items.trim().length > 0) {
+        try {
+          parsedItems = JSON.parse('[' + order.items + ']');
+        } catch (e) {
+          parsedItems = [];
+        }
+      }
+      return {
+        ...order,
+        items: parsedItems
+      };
+    });
     
     success(res, {
       orders: processedOrders,
@@ -416,4 +383,117 @@ router.post('/batch', asyncHandler(async (req, res) => {
   }
 }));
 
+/**
+ * 取消订单
+ * PUT /api/orders/:id/cancel
+ */
+router.put('/:id/cancel', asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const orderId = parseInt(req.params.id, 10);
+    if (Number.isNaN(orderId)) {
+      return error(res, '订单ID不合法', 400);
+    }
+
+    // 仅允许取消待付款订单
+    const [orders] = await query(
+      'SELECT * FROM orders WHERE id = ? AND user_id = ? LIMIT 1',
+      [orderId, userId]
+    );
+    if (orders.length === 0) {
+      return error(res, '订单不存在', 404);
+    }
+    const order = orders[0];
+    if (order.status !== 'pending') {
+      return error(res, '仅待付款订单可取消', 400);
+    }
+
+    // 恢复库存
+    const [items] = await query(
+      'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
+      [orderId]
+    );
+    for (const it of items) {
+      await query(
+        'UPDATE products SET stock = stock + ?, sales = GREATEST(sales - ?, 0) WHERE id = ?',
+        [it.quantity, it.quantity, it.product_id]
+      );
+    }
+
+    // 更新订单状态
+    await query(
+      'UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?',
+      ['cancelled', orderId]
+    );
+
+    success(res, null, '订单取消成功');
+  } catch (err) {
+    console.error('取消订单失败:', err);
+    error(res, '取消订单失败', 500, err.message);
+  }
+}));
+
 module.exports = router;
+/**
+ * 获取订单详情
+ * GET /api/orders/:id
+ */
+router.get('/:id', asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const orderId = parseInt(req.params.id, 10);
+    if (Number.isNaN(orderId)) {
+      return error(res, '订单ID不合法', 400);
+    }
+
+    // 查询订单
+    const orders = await query(
+      'SELECT * FROM orders WHERE id = ? AND user_id = ? LIMIT 1',
+      [orderId, userId]
+    );
+    if (orders.length === 0) {
+      return error(res, '订单不存在', 404);
+    }
+    const order = orders[0];
+
+    // 查询订单项
+    const items = await query(
+      `SELECT oi.id, oi.product_id, oi.product_name, oi.product_image, oi.price, oi.quantity,
+              p.id as p_id, p.name as p_name, p.image as p_image, p.price as p_price
+       FROM order_items oi
+       LEFT JOIN products p ON p.id = oi.product_id
+       WHERE oi.order_id = ?`,
+      [orderId]
+    );
+
+    const formattedItems = items.map(it => ({
+      id: it.id,
+      quantity: it.quantity,
+      product: {
+        id: it.product_id || it.p_id,
+        name: it.product_name || it.p_name,
+        image: it.product_image || it.p_image,
+        price: parseFloat(it.price || it.p_price)
+      }
+    }));
+
+    const data = {
+      id: order.id,
+      orderNo: order.order_no,
+      status: order.status,
+      totalAmount: parseFloat(order.total_amount),
+      receiverInfo: {
+        name: order.receiver_name,
+        phone: order.receiver_phone,
+        address: order.receiver_address
+      },
+      items: formattedItems,
+      createdAt: order.created_at
+    };
+
+    success(res, data, '获取订单详情成功');
+  } catch (err) {
+    console.error('获取订单详情失败:', err);
+    error(res, '获取订单详情失败', 500, err.message);
+  }
+}));
