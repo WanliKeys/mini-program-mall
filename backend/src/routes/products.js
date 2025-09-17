@@ -81,24 +81,40 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
     let images = [];
     let tags = [];
     
-    try {
-      images = product.images ? JSON.parse(product.images) : [];
-    } catch (e) {
-      console.warn('Failed to parse images JSON:', product.images);
-      images = [];
+    // 处理images字段
+    if (product.images) {
+      if (typeof product.images === 'string') {
+        try {
+          images = JSON.parse(product.images);
+        } catch (e) {
+          console.warn('Failed to parse images JSON:', product.images);
+          images = [];
+        }
+      } else if (Array.isArray(product.images)) {
+        images = product.images;
+      }
     }
     
-    try {
-      tags = product.tags ? JSON.parse(product.tags) : [];
-    } catch (e) {
-      console.warn('Failed to parse tags JSON:', product.tags);
-      tags = [];
+    // 处理tags字段
+    if (product.tags) {
+      if (typeof product.tags === 'string') {
+        try {
+          tags = JSON.parse(product.tags);
+        } catch (e) {
+          console.warn('Failed to parse tags JSON:', product.tags);
+          tags = [];
+        }
+      } else if (Array.isArray(product.tags)) {
+        tags = product.tags;
+      }
     }
     
     return {
       ...product,
       images,
-      tags
+      tags,
+      price: parseFloat(product.price),
+      original_price: product.original_price ? parseFloat(product.original_price) : null
     };
   });
 
@@ -127,11 +143,45 @@ router.get('/:id', optionalAuth, asyncHandler(async (req, res) => {
 
   const product = products[0];
   
-  // 处理JSON字段
-  product.images = product.images ? JSON.parse(product.images) : [];
-  product.tags = product.tags ? JSON.parse(product.tags) : [];
+  // 安全处理JSON字段
+  let images = [];
+  let tags = [];
+  
+  // 处理images字段
+  if (product.images) {
+    if (typeof product.images === 'string') {
+      try {
+        images = JSON.parse(product.images);
+      } catch (e) {
+        console.warn('Failed to parse images JSON for product', product.id, ':', product.images);
+        images = [];
+      }
+    } else if (Array.isArray(product.images)) {
+      images = product.images;
+    }
+  }
+  
+  // 处理tags字段
+  if (product.tags) {
+    if (typeof product.tags === 'string') {
+      try {
+        tags = JSON.parse(product.tags);
+      } catch (e) {
+        console.warn('Failed to parse tags JSON for product', product.id, ':', product.tags);
+        tags = [];
+      }
+    } else if (Array.isArray(product.tags)) {
+      tags = product.tags;
+    }
+  }
+  
+  const processedProduct = {
+    ...product,
+    images,
+    tags
+  };
 
-  success(res, product, '获取商品详情成功');
+  success(res, processedProduct, '获取商品详情成功');
 }));
 
 /**
