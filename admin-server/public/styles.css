@@ -430,6 +430,7 @@ body {
     border-radius: var(--border-radius);
     cursor: pointer;
     transition: all 0.3s;
+    position: relative;
 }
 
 .user-menu:hover {
@@ -464,6 +465,43 @@ body {
 .user-role {
     font-size: var(--font-size-xs);
     color: var(--text-secondary);
+}
+
+/* 用户下拉菜单 */
+.user-dropdown {
+    position: absolute;
+    right: 0;
+    top: 48px;
+    background: #fff;
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-lg);
+    border-radius: var(--border-radius);
+    min-width: 180px;
+    overflow: hidden;
+    z-index: 2000;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.dropdown-item:hover {
+    background: var(--background-light);
+}
+
+.dropdown-item.danger {
+    color: var(--danger-color);
+}
+
+.dropdown-divider {
+    height: 1px;
+    background: var(--border-light);
 }
 
 /* 内容区域 */
@@ -929,6 +967,60 @@ body {
     justify-content: center;
     padding: 80px 20px;
     color: var(--text-secondary);
+}
+
+/* 通用模态框 */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+}
+
+.modal-container {
+    width: 420px;
+    max-width: 90vw;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.modal-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.modal-close {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.modal-body {
+    padding: 20px;
+    color: var(--text-primary);
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 12px 20px 20px;
 }
 
 .empty-state .empty-icon {

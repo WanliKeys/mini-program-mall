@@ -237,9 +237,23 @@ function toggleTheme() {
 }
 
 // 切换用户菜单
-function toggleUserMenu() {
-    // 这里可以实现用户菜单功能
-    console.log('切换用户菜单');
+function toggleUserMenu(e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const menu = document.getElementById('user-dropdown');
+    if (!menu) return;
+    const isShown = menu.style.display === 'block';
+    menu.style.display = isShown ? 'none' : 'block';
+    // 点击外部关闭
+    if (!isShown) {
+        const handler = (e) => {
+            const container = document.querySelector('.user-menu');
+            if (container && !container.contains(e.target)) {
+                menu.style.display = 'none';
+                document.removeEventListener('click', handler);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', handler), 0);
+    }
 }
 
 // 加载页面数据
@@ -652,14 +666,81 @@ function saveBanner() {
 
 // 登出
 function logout() {
-    if (confirm('确定要退出登录吗？')) {
+    showConfirmModal('确定要退出登录吗？', (ok) => {
+        if (!ok) return;
         localStorage.removeItem('admin_token');
         currentToken = null;
         showMessage('已退出登录', 'info');
         showPage('login');
-        
         // 清空表单
         document.getElementById('username').value = '';
         document.getElementById('password').value = '';
+    });
+}
+
+// 通用确认弹窗
+let _confirmResolver = null;
+function showConfirmModal(message, cb) {
+    const overlay = document.getElementById('confirm-modal');
+    const msg = document.getElementById('confirm-modal-message');
+    if (!overlay || !msg) return cb(true);
+    msg.textContent = message || '确认操作？';
+    overlay.style.display = 'flex';
+    _confirmResolver = cb;
+}
+
+function hideConfirmModal() {
+    const overlay = document.getElementById('confirm-modal');
+    if (overlay) overlay.style.display = 'none';
+}
+
+function onConfirmModal(ok) {
+    try {
+        if (typeof _confirmResolver === 'function') _confirmResolver(!!ok);
+    } finally {
+        hideConfirmModal();
+        _confirmResolver = null;
     }
+}
+
+// 个人信息
+function openProfileModal() {
+    const m = document.getElementById('profile-modal');
+    if (m) m.style.display = 'flex';
+}
+function closeProfileModal() {
+    const m = document.getElementById('profile-modal');
+    if (m) m.style.display = 'none';
+}
+function saveProfile() {
+    const nickname = document.getElementById('profile-nickname').value.trim();
+    // TODO: 调用后端保存，这里直接提示成功
+    showMessage('个人信息已保存', 'success');
+    closeProfileModal();
+}
+
+// 修改密码
+function openChangePasswordModal() {
+    const m = document.getElementById('password-modal');
+    if (m) m.style.display = 'flex';
+}
+function closeChangePasswordModal() {
+    const m = document.getElementById('password-modal');
+    if (m) m.style.display = 'none';
+}
+function changePassword() {
+    const oldPwd = document.getElementById('old-password').value;
+    const newPwd = document.getElementById('new-password').value;
+    const confirmPwd = document.getElementById('confirm-password').value;
+    if (!oldPwd || !newPwd) {
+        showMessage('请输入完整信息', 'error');
+        return;
+    }
+    if (newPwd !== confirmPwd) {
+        showMessage('两次输入的密码不一致', 'error');
+        return;
+    }
+    // TODO: 调用后端修改密码，这里直接提示成功
+    showMessage('密码修改成功', 'success');
+    closeChangePasswordModal();
 }

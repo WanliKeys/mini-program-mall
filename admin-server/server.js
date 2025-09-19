@@ -18,9 +18,21 @@ app.use(express.urlencoded({ extended: true }));
 
 // 静态文件服务 - 添加缓存和压缩
 app.use(express.static(path.join(__dirname, 'public'), {
-    maxAge: '1d', // 缓存1天
+    maxAge: '1d', // 缓存1天（HTML等）
     etag: true,
-    lastModified: true
+    lastModified: true,
+    setHeaders: (res, filePath) => {
+      const ext = path.extname(filePath).toLowerCase();
+      // 对静态资源开启长期缓存并标记 immutable
+      if (['.js', '.mjs', '.css', '.woff2', '.woff'].includes(ext)) {
+        if ((process.env.NODE_ENV || 'development') === 'production') {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else {
+          // 开发环境避免缓存导致前端脚本不更新
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      }
+    }
 }));
 
 // 配置文件上传
