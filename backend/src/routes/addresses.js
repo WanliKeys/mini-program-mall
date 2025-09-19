@@ -25,20 +25,7 @@ router.get('/', asyncHandler(async (req, res) => {
     
   } catch (err) {
     console.error('获取地址列表失败:', err);
-    // 返回模拟数据
-    success(res, [
-      {
-        id: 1,
-        receiver_name: '张三',
-        receiver_phone: '13800138000',
-        province: '北京市',
-        city: '北京市',
-        district: '朝阳区',
-        detail_address: '某某街道123号',
-        is_default: 1,
-        created_at: '2025-09-17T01:30:00.000Z'
-      }
-    ], '获取地址列表成功');
+    error(res, '获取地址列表失败', 500, err.message);
   }
 }));
 

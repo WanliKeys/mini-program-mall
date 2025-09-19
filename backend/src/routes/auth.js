@@ -81,38 +81,6 @@ router.post('/login', asyncHandler(async (req, res) => {
 
   } catch (err) {
     console.error('登录错误:', err);
-    
-    // 如果是微信API调用失败，提供模拟登录（开发环境）
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔧 开发环境：使用模拟登录');
-      
-      const mockOpenid = `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // 创建模拟用户
-      const result = await query(
-        'INSERT INTO users (openid, nickname) VALUES (?, ?)',
-        [mockOpenid, '模拟用户']
-      );
-      
-      const user = {
-        id: result.insertId,
-        openid: mockOpenid,
-        nickname: '模拟用户',
-        avatar: null,
-        phone: null
-      };
-
-      const token = generateToken({
-        userId: user.id,
-        openid: user.openid
-      });
-
-      return success(res, {
-        token,
-        user
-      }, '模拟登录成功');
-    }
-    
     return error(res, '登录服务暂时不可用', 500);
   }
 }));

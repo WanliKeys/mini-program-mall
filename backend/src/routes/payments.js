@@ -82,24 +82,7 @@ router.post('/pay', asyncHandler(async (req, res) => {
         
       } catch (err) {
         console.error('微信支付创建失败:', err);
-        
-        // 开发环境下返回模拟数据
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🔧 开发环境：使用微信支付模拟数据');
-          paymentData = {
-            paymentId,
-            paymentNo,
-            paymentMethod: 'wechat',
-            prepayId: 'mock_prepay_id_' + Date.now(),
-            nonceStr: Math.random().toString(36).substr(2, 15),
-            timeStamp: Math.floor(Date.now() / 1000).toString(),
-            package: 'prepay_id=mock_prepay_id_' + Date.now(),
-            signType: 'RSA',
-            paySign: 'mock_sign_' + Math.random().toString(36).substr(2, 15)
-          };
-        } else {
-          throw err;
-        }
+        throw err;
       }
       
     } else if (paymentMethod === 'alipay') {
@@ -243,34 +226,6 @@ router.get('/status/:paymentNo', asyncHandler(async (req, res) => {
   }
 }));
 
-/**
- * 模拟支付成功 (仅开发环境)
- * POST /api/payments/mock-success
- */
-router.post('/mock-success', asyncHandler(async (req, res) => {
-  if (process.env.NODE_ENV !== 'development') {
-    return error(res, '该接口仅在开发环境可用', 403);
-  }
-  
-  try {
-    const { paymentNo } = req.body;
-    
-    if (!paymentNo) {
-      return error(res, '支付单号不能为空', 400);
-    }
-    
-    // 模拟第三方交易号
-    const thirdPartyNo = 'MOCK_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6).toUpperCase();
-    
-    await handlePaymentSuccess(paymentNo, thirdPartyNo, 'mock');
-    
-    success(res, null, '模拟支付成功');
-    
-  } catch (err) {
-    console.error('模拟支付失败:', err);
-    error(res, '模拟支付失败', 500, err.message);
-  }
-}));
 
 // 辅助函数：处理支付成功
 async function handlePaymentSuccess(paymentNo, thirdPartyNo, paymentMethod) {

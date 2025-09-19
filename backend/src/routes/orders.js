@@ -34,11 +34,7 @@ router.get('/stats', asyncHandler(async (req, res) => {
     
   } catch (err) {
     console.error('获取订单统计失败:', err);
-    // 返回模拟数据
-    success(res, {
-      pending: 1,
-      completed: 2
-    }, '获取订单统计成功');
+    error(res, '获取订单统计失败', 500, err.message);
   }
 }));
 
@@ -311,14 +307,11 @@ router.post('/batch', asyncHandler(async (req, res) => {
     // 创建订单
     const orderResult = await query(
       `INSERT INTO orders (
-        order_no, user_id, total_amount, status, source,
-        receiver_name, receiver_phone, receiver_address,
+        order_no, user_id, address_id, total_amount, status, source,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
-        orderNo, userId, totalAmount, 'pending', 'direct',
-        address.name, address.phone,
-        `${address.province} ${address.city} ${address.district} ${address.detail}`
+        orderNo, userId, address.id, totalAmount, 'pending', 'direct'
       ]
     );
     
@@ -333,11 +326,11 @@ router.post('/batch', asyncHandler(async (req, res) => {
       await query(
         `INSERT INTO order_items (
           order_id, product_id, product_name, product_image,
-          price, quantity, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+          product_price, quantity, subtotal, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
           orderId, item.product.id, item.product.name, item.product.image,
-          item.product.price, item.quantity
+          item.product.price, item.quantity, item.subtotal
         ]
       );
       
@@ -478,15 +471,23 @@ router.get('/:id', asyncHandler(async (req, res) => {
       }
     }));
 
+    // 获取收货地址信息
+    const addresses = await query(
+      'SELECT * FROM addresses WHERE id = ?',
+      [order.address_id]
+    );
+    
+    const address = addresses[0] || {};
+
     const data = {
       id: order.id,
       orderNo: order.order_no,
       status: order.status,
       totalAmount: parseFloat(order.total_amount),
       receiverInfo: {
-        name: order.receiver_name,
-        phone: order.receiver_phone,
-        address: order.receiver_address
+        name: address.name || '',
+        phone: address.phone || '',
+        address: address.detail ? `${address.province} ${address.city} ${address.district} ${address.detail}` : ''
       },
       items: formattedItems,
       createdAt: order.created_at
