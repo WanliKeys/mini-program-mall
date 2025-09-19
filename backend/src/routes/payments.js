@@ -199,7 +199,7 @@ router.get('/status/:paymentNo', asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const paymentNo = req.params.paymentNo;
     
-    const [payments] = await query(
+    const payments = await query(
       'SELECT * FROM payments WHERE payment_no = ? AND user_id = ?',
       [paymentNo, userId]
     );
@@ -237,7 +237,7 @@ async function handlePaymentSuccess(paymentNo, thirdPartyNo, paymentMethod) {
     );
     
     // 获取支付记录
-    const [payments] = await query(
+    const payments = await query(
       'SELECT * FROM payments WHERE payment_no = ?',
       [paymentNo]
     );
@@ -255,7 +255,7 @@ async function handlePaymentSuccess(paymentNo, thirdPartyNo, paymentMethod) {
     );
     
     // 获取订单信息
-    const [orders] = await query(
+    const orders = await query(
       'SELECT * FROM orders WHERE id = ?',
       [payment.order_id]
     );

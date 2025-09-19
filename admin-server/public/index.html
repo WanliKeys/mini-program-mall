@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商城管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+</head>
+<body>
+    <!-- 登录页面 -->
+    <div id="login-page" class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo">
+                    <i class="bi bi-shop"></i>
+                    <span>商城管理系统</span>
+                </div>
+                <p class="login-subtitle">专业的电商管理解决方案</p>
+            </div>
+            <form id="login-form" class="login-form">
+                <div class="form-group">
+                    <label for="username" class="form-label">用户名</label>
+                    <div class="input-group">
+                        <i class="bi bi-person input-icon"></i>
+                        <input type="text" class="form-control" id="username" placeholder="请输入用户名" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="password" class="form-label">密码</label>
+                    <div class="input-group">
+                        <i class="bi bi-lock input-icon"></i>
+                        <input type="password" class="form-control" id="password" placeholder="请输入密码" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-login">
+                    <i class="bi bi-box-arrow-in-right"></i>
+                    登录系统
+                </button>
+                <div class="login-footer">
+                    <small class="text-muted">默认账号: admin / admin123</small>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 管理后台布局 -->
+    <div id="admin-layout" class="admin-layout" style="display: none;">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="bi bi-shop"></i>
+                    <span>商城管理</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">主要功能</div>
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link active" data-page="dashboard">
+                                <i class="bi bi-speedometer2"></i>
+                                <span>仪表盘</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-section-title">商品管理</div>
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="products">
+                                <i class="bi bi-box-seam"></i>
+                                <span>商品列表</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="categories">
+                                <i class="bi bi-collection"></i>
+                                <span>商品分类</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-section-title">内容管理</div>
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="banners">
+                                <i class="bi bi-image"></i>
+                                <span>轮播图</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-section-title">订单管理</div>
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-page="orders">
+                                <i class="bi bi-cart-check"></i>
+                                <span>订单列表</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 顶部导航栏 -->
+            <header class="main-header">
+                <div class="header-left">
+                    <button class="sidebar-toggle" onclick="toggleSidebar()">
+                        <i class="bi bi-list"></i>
+                    </button>
+                    <div class="breadcrumb">
+                        <span class="breadcrumb-item active" id="page-title">仪表盘</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="header-actions">
+                        <button class="action-btn" onclick="refreshPage()" title="刷新">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        <button class="action-btn" onclick="toggleTheme()" title="切换主题">
+                            <i class="bi bi-moon"></i>
+                        </button>
+                    </div>
+                    <div class="user-menu" onclick="toggleUserMenu()">
+                        <div class="user-avatar">A</div>
+                        <div class="user-info">
+                            <span class="user-name">管理员</span>
+                            <span class="user-role">超级管理员</span>
+                        </div>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 内容区域 -->
+            <div class="content-area">
+                <!-- 仪表盘页面 -->
+                <div id="dashboard-page" class="page">
+                    <!-- 统计卡片 -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="bi bi-box-seam"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="total-products">-</div>
+                                <div class="stat-label">商品总数</div>
+                                <div class="stat-trend positive">
+                                    <i class="bi bi-arrow-up"></i>
+                                    <span>+12%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon success">
+                                <i class="bi bi-cart-check"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="total-orders">-</div>
+                                <div class="stat-label">订单总数</div>
+                                <div class="stat-trend positive">
+                                    <i class="bi bi-arrow-up"></i>
+                                    <span>+8%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon warning">
+                                <i class="bi bi-collection"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="total-categories">-</div>
+                                <div class="stat-label">分类总数</div>
+                                <div class="stat-trend neutral">
+                                    <i class="bi bi-dash"></i>
+                                    <span>0%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon info">
+                                <i class="bi bi-image"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="total-banners">-</div>
+                                <div class="stat-label">轮播图总数</div>
+                                <div class="stat-trend positive">
+                                    <i class="bi bi-arrow-up"></i>
+                                    <span>+5%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 快速操作 -->
+                    <div class="quick-actions">
+                        <h3>快速操作</h3>
+                        <div class="action-grid">
+                            <div class="action-card" onclick="showPage('products')">
+                                <div class="action-icon">
+                                    <i class="bi bi-plus-circle"></i>
+                                </div>
+                                <div class="action-content">
+                                    <h4>添加商品</h4>
+                                    <p>快速添加新商品到商城</p>
+                                </div>
+                            </div>
+                            <div class="action-card" onclick="showPage('orders')">
+                                <div class="action-icon">
+                                    <i class="bi bi-eye"></i>
+                                </div>
+                                <div class="action-content">
+                                    <h4>查看订单</h4>
+                                    <p>管理用户订单状态</p>
+                                </div>
+                            </div>
+                            <div class="action-card" onclick="showPage('categories')">
+                                <div class="action-icon">
+                                    <i class="bi bi-tags"></i>
+                                </div>
+                                <div class="action-content">
+                                    <h4>管理分类</h4>
+                                    <p>组织商品分类结构</p>
+                                </div>
+                            </div>
+                            <div class="action-card" onclick="showPage('banners')">
+                                <div class="action-icon">
+                                    <i class="bi bi-image"></i>
+                                </div>
+                                <div class="action-content">
+                                    <h4>轮播图</h4>
+                                    <p>设置首页展示内容</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 最近订单 -->
+                    <div class="recent-orders">
+                        <div class="section-header">
+                            <h3>最近订单</h3>
+                            <button class="btn btn-outline btn-sm" onclick="showPage('orders')">
+                                查看全部
+                            </button>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>订单号</th>
+                                        <th>用户</th>
+                                        <th>金额</th>
+                                        <th>状态</th>
+                                        <th>创建时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-orders">
+                                    <tr>
+                                        <td colspan="6" class="text-center">
+                                            <div class="loading-state">
+                                                <div class="spinner"></div>
+                                                <p>加载中...</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 商品管理页面 -->
+                <div id="products-page" class="page" style="display: none;">
+                    <div class="page-header">
+                        <div class="page-title">
+                            <h2>商品管理</h2>
+                            <p>管理商城中的所有商品</p>
+                        </div>
+                        <div class="page-actions">
+                            <button class="btn btn-outline" onclick="exportProducts()">
+                                <i class="bi bi-download"></i> 导出
+                            </button>
+                            <button class="btn btn-primary" onclick="showProductModal()">
+                                <i class="bi bi-plus"></i> 添加商品
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="filter-section">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <input type="text" class="form-control" id="product-search" placeholder="搜索商品名称、描述...">
+                            </div>
+                            <div class="filter-group">
+                                <select class="form-control" id="category-filter">
+                                    <option value="">所有分类</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <select class="form-control" id="status-filter">
+                                    <option value="">所有状态</option>
+                                    <option value="1">上架</option>
+                                    <option value="0">下架</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <button class="btn btn-primary" onclick="loadProducts()">
+                                    <i class="bi bi-search"></i> 搜索
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="content-card">
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="40">
+                                            <input type="checkbox" id="select-all" class="checkbox">
+                                        </th>
+                                        <th width="80">ID</th>
+                                        <th>商品信息</th>
+                                        <th width="120">分类</th>
+                                        <th width="100">价格</th>
+                                        <th width="80">库存</th>
+                                        <th width="100">状态</th>
+                                        <th width="120">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="products-table">
+                                    <tr>
+                                        <td colspan="8" class="text-center">
+                                            <div class="loading-state">
+                                                <div class="spinner"></div>
+                                                <p>加载中...</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="pagination-wrapper">
+                            <div class="pagination" id="products-pagination">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 分类管理页面 -->
+                <div id="categories-page" class="page" style="display: none;">
+                    <div class="page-header">
+                        <div class="page-title">
+                            <h2>商品分类</h2>
+                            <p>管理商品分类信息</p>
+                        </div>
+                        <div class="page-actions">
+                            <button class="btn btn-outline" onclick="sortCategories()">
+                                <i class="bi bi-sort-alpha-down"></i> 排序
+                            </button>
+                            <button class="btn btn-primary" onclick="showCategoryModal()">
+                                <i class="bi bi-plus"></i> 添加分类
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="content-card">
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="60">ID</th>
+                                        <th>分类信息</th>
+                                        <th width="100">排序</th>
+                                        <th width="100">商品数量</th>
+                                        <th width="100">状态</th>
+                                        <th width="120">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="categories-table">
+                                    <tr>
+                                        <td colspan="6" class="text-center">
+                                            <div class="loading-state">
+                                                <div class="spinner"></div>
+                                                <p>加载中...</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 轮播图管理页面 -->
+                <div id="banners-page" class="page" style="display: none;">
+                    <div class="page-header">
+                        <div class="page-title">
+                            <h2>轮播图管理</h2>
+                            <p>管理首页轮播图展示</p>
+                        </div>
+                        <div class="page-actions">
+                            <button class="btn btn-outline" onclick="previewBanners()">
+                                <i class="bi bi-eye"></i> 预览
+                            </button>
+                            <button class="btn btn-primary" onclick="showBannerModal()">
+                                <i class="bi bi-plus"></i> 添加轮播图
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="content-card">
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="60">ID</th>
+                                        <th>轮播图信息</th>
+                                        <th width="200">跳转链接</th>
+                                        <th width="100">排序</th>
+                                        <th width="100">状态</th>
+                                        <th width="120">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="banners-table">
+                                    <tr>
+                                        <td colspan="6" class="text-center">
+                                            <div class="loading-state">
+                                                <div class="spinner"></div>
+                                                <p>加载中...</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 订单管理页面 -->
+                <div id="orders-page" class="page" style="display: none;">
+                    <div class="page-header">
+                        <div class="page-title">
+                            <h2>订单管理</h2>
+                            <p>查看和处理用户订单</p>
+                        </div>
+                        <div class="page-actions">
+                            <button class="btn btn-outline" onclick="exportOrders()">
+                                <i class="bi bi-download"></i> 导出订单
+                            </button>
+                            <button class="btn btn-primary" onclick="refreshOrders()">
+                                <i class="bi bi-arrow-clockwise"></i> 刷新
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="stats-row">
+                        <div class="stat-item">
+                            <div class="stat-value" id="total-orders-count">-</div>
+                            <div class="stat-label">总订单</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="pending-orders-count">-</div>
+                            <div class="stat-label">待处理</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="completed-orders-count">-</div>
+                            <div class="stat-label">已完成</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="total-amount">-</div>
+                            <div class="stat-label">总金额</div>
+                        </div>
+                    </div>
+
+                    <div class="filter-section">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <input type="text" class="form-control" id="order-search" placeholder="搜索订单号、用户...">
+                            </div>
+                            <div class="filter-group">
+                                <select class="form-control" id="order-status-filter">
+                                    <option value="">所有状态</option>
+                                    <option value="pending">待付款</option>
+                                    <option value="paid">已付款</option>
+                                    <option value="shipped">已发货</option>
+                                    <option value="completed">已完成</option>
+                                    <option value="cancelled">已取消</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <input type="date" class="form-control" id="order-date-from" placeholder="开始日期">
+                            </div>
+                            <div class="filter-group">
+                                <input type="date" class="form-control" id="order-date-to" placeholder="结束日期">
+                            </div>
+                            <div class="filter-group">
+                                <button class="btn btn-primary" onclick="loadOrders()">
+                                    <i class="bi bi-search"></i> 搜索
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="content-card">
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th width="180">订单号</th>
+                                        <th width="120">用户</th>
+                                        <th width="100">金额</th>
+                                        <th width="100">状态</th>
+                                        <th width="150">创建时间</th>
+                                        <th width="120">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="orders-table">
+                                    <tr>
+                                        <td colspan="6" class="text-center">
+                                            <div class="loading-state">
+                                                <div class="spinner"></div>
+                                                <p>加载中...</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="pagination-wrapper">
+                            <div class="pagination" id="orders-pagination">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

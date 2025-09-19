@@ -20,7 +20,7 @@ router.post('/track', authenticate, asyncHandler(async (req, res) => {
     }
     
     // 验证商品是否存在
-    const [products] = await query(
+    const products = await query(
       'SELECT id, name FROM products WHERE id = ? AND status = 1',
       [productId]
     );
@@ -72,13 +72,13 @@ router.get('/stats', asyncHandler(async (req, res) => {
     }
     
     // 总访问量
-    const [visitStats] = await query(
+    const visitStats = await query(
       `SELECT COUNT(*) as total_visits FROM referral_logs ${whereClause} AND action = 'visit'`,
       params
     );
     
     // 购买转化
-    const [purchaseStats] = await query(
+    const purchaseStats = await query(
       `SELECT COUNT(*) as total_purchases FROM referral_logs ${whereClause} AND action = 'purchase'`,
       params
     );
@@ -193,7 +193,7 @@ router.get('/logs', asyncHandler(async (req, res) => {
     );
     
     // 获取总数
-    const [countResult] = await query(
+    const countResult = await query(
       `SELECT COUNT(*) as total FROM referral_logs rl ${whereClause}`,
       params
     );
@@ -231,7 +231,7 @@ router.get('/order/:orderNo', asyncHandler(async (req, res) => {
     const orderNo = req.params.orderNo;
     
     // 获取订单信息
-    const [orders] = await query(
+    const orders = await query(
       'SELECT * FROM orders WHERE order_no = ?',
       [orderNo]
     );

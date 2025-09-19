@@ -17,12 +17,12 @@ router.get('/stats', asyncHandler(async (req, res) => {
   try {
     const userId = req.user.id;
     
-    const [pending] = await query(
+    const pending = await query(
       'SELECT COUNT(*) as count FROM orders WHERE user_id = ? AND status = ?',
       [userId, 'pending']
     );
     
-    const [completed] = await query(
+    const completed = await query(
       'SELECT COUNT(*) as count FROM orders WHERE user_id = ? AND status = ?',
       [userId, 'completed']
     );
@@ -390,7 +390,7 @@ router.put('/:id/cancel', asyncHandler(async (req, res) => {
     }
 
     // 仅允许取消待付款订单
-    const [orders] = await query(
+    const orders = await query(
       'SELECT * FROM orders WHERE id = ? AND user_id = ? LIMIT 1',
       [orderId, userId]
     );
@@ -403,7 +403,7 @@ router.put('/:id/cancel', asyncHandler(async (req, res) => {
     }
 
     // 恢复库存
-    const [items] = await query(
+    const items = await query(
       'SELECT product_id, quantity FROM order_items WHERE order_id = ?',
       [orderId]
     );

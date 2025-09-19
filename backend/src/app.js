@@ -54,6 +54,11 @@ app.use('/api/payments', require('./routes/payments'));
 app.use('/api/upload', require('./routes/upload'));
 app.use('/api/referral', require('./routes/referral'));
 
+// 管理员API路由
+app.use('/api/admin/products', require('./routes/admin/products'));
+app.use('/api/admin/categories', require('./routes/admin/categories'));
+app.use('/api/admin/banners', require('./routes/admin/banners'));
+
 // 404处理
 app.use(notFoundHandler);
 

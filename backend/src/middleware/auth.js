@@ -101,7 +101,67 @@ const optionalAuth = async (req, res, next) => {
   }
 };
 
+/**
+ * 管理员认证中间件
+ */
+const adminAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        code: 401,
+        message: '缺少认证令牌',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // 查询用户信息
+    const users = await query(
+      'SELECT id, openid, nickname, avatar, phone, role FROM users WHERE id = ?',
+      [decoded.userId]
+    );
+    
+    if (users.length === 0) {
+      return res.status(401).json({
+        success: false,
+        code: 401,
+        message: '用户不存在',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    const user = users[0];
+    
+    // 检查是否为管理员
+    if (user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        code: 403,
+        message: '权限不足，需要管理员权限',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    req.user = user;
+    next();
+  } catch (err) {
+    console.error('管理员认证错误:', err);
+    return res.status(401).json({
+      success: false,
+      code: 401,
+      message: '认证令牌无效或已过期',
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
 module.exports = {
   authenticate,
-  optionalAuth
+  optionalAuth,
+  adminAuth
 };

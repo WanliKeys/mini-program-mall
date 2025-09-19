@@ -205,7 +205,7 @@ router.delete('/:id', asyncHandler(async (req, res) => {
     const addressId = req.params.id;
     
     // 验证地址是否存在且属于当前用户
-    const [addresses] = await query(
+    const addresses = await query(
       'SELECT * FROM addresses WHERE id = ? AND user_id = ?',
       [addressId, userId]
     );
@@ -238,7 +238,7 @@ router.post('/:id/default', asyncHandler(async (req, res) => {
     const addressId = req.params.id;
     
     // 验证地址是否存在且属于当前用户
-    const [addresses] = await query(
+    const addresses = await query(
       'SELECT * FROM addresses WHERE id = ? AND user_id = ?',
       [addressId, userId]
     );

@@ -2,7 +2,7 @@ const express = require('express');
 const { query, beginTransaction, commit, rollback } = require('../config/database');
 const { success, error } = require('../utils/response');
 const { asyncHandler } = require('../middleware/errorHandler');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -181,7 +181,12 @@ router.delete('/', authenticate, asyncHandler(async (req, res) => {
  * 获取购物车商品数量
  * GET /api/cart/count
  */
-router.get('/count', authenticate, asyncHandler(async (req, res) => {
+router.get('/count', optionalAuth, asyncHandler(async (req, res) => {
+  // 如果用户未登录，返回购物车数量为0
+  if (!req.user || !req.user.id) {
+    return success(res, { count: 0 }, '获取购物车数量成功');
+  }
+
   const result = await query(`
     SELECT COALESCE(SUM(c.quantity), 0) as count
     FROM cart c
