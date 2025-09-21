@@ -1,4 +1,5 @@
 const { verifyToken } = require('../utils/jwt');
+const jwt = require('jsonwebtoken');
 const { unauthorized } = require('../utils/response');
 const { query } = require('../config/database');
 

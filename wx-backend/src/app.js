@@ -5,7 +5,7 @@ const morgan = require('morgan');
 const path = require('path');
 require('dotenv').config();
 
-const { testConnection } = require('./config/database');
+const { testConnection, ensureAdminSetup } = require('./config/database');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -58,6 +58,7 @@ app.use('/api/referral', require('./routes/referral'));
 app.use('/api/admin/products', require('./routes/admin/products'));
 app.use('/api/admin/categories', require('./routes/admin/categories'));
 app.use('/api/admin/banners', require('./routes/admin/banners'));
+app.use('/api/admin', require('./routes/admin'));
 
 // 404处理
 app.use(notFoundHandler);
@@ -88,6 +89,8 @@ const startServer = async () => {
 ⏰ 启动时间: ${new Date().toLocaleString('zh-CN')}
       `);
     });
+    // 启动后初始化管理员设置（开发/本地场景）
+    await ensureAdminSetup();
   } catch (error) {
     console.error('❌ 服务器启动失败:', error);
     process.exit(1);

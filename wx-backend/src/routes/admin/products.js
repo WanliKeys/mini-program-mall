@@ -33,8 +33,13 @@ const upload = multer({
   }
 });
 
-// 所有接口都需要管理员权限
-router.use(adminAuth);
+// 所有接口都需要管理员权限（支持开发环境跳过）
+router.use((req, res, next) => {
+  if (process.env.SKIP_ADMIN_AUTH === '1' || process.env.SKIP_ADMIN_AUTH === 'true') {
+    return next();
+  }
+  return adminAuth(req, res, next);
+});
 
 /**
  * 获取商品列表（管理员）
@@ -42,58 +47,60 @@ router.use(adminAuth);
  */
 router.get('/', asyncHandler(async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      pageSize = 10, 
-      categoryId, 
-      status, 
-      keyword 
+    const {
+      page = 1,
+      pageSize = 10,
+      categoryId,
+      status,
+      keyword
     } = req.query;
-    
-    let whereClause = 'WHERE 1=1';
-    const params = [];
-    
-    if (categoryId) {
-      whereClause += ' AND p.category_id = ?';
-      params.push(categoryId);
+
+    const pageNum = Number.parseInt(page, 10) || 1;
+    const pageSizeNum = Number.parseInt(pageSize, 10) || 10;
+    const offset = (pageNum - 1) * pageSizeNum;
+
+    const whereConditions = ['1=1'];
+    const mysql2 = require('mysql2');
+
+    if (categoryId !== undefined && String(categoryId).trim() !== '') {
+      whereConditions.push(`p.category_id = ${mysql2.escape(Number.parseInt(categoryId, 10))}`);
     }
-    
-    if (status !== undefined) {
-      whereClause += ' AND p.status = ?';
-      params.push(status);
+
+    if (status !== undefined && String(status).trim() !== '') {
+      whereConditions.push(`p.status = ${mysql2.escape(Number.parseInt(status, 10))}`);
     }
-    
-    if (keyword) {
-      whereClause += ' AND (p.name LIKE ? OR p.description LIKE ?)';
-      params.push(`%${keyword}%`, `%${keyword}%`);
+
+    if (keyword !== undefined && String(keyword).trim() !== '') {
+      const kw = `%${String(keyword).trim()}%`;
+      const esc = mysql2.escape(kw);
+      whereConditions.push(`(p.name LIKE ${esc} OR p.description LIKE ${esc})`);
     }
-    
-    const offset = (page - 1) * pageSize;
-    
-    const products = await query(`
-      SELECT 
-        p.*,
-        c.name as category_name
+
+    const whereClause = whereConditions.join(' AND ');
+
+    const listSql = `
+      SELECT p.*, c.name AS category_name
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      ${whereClause}
+      WHERE ${whereClause}
       ORDER BY p.created_at DESC
-      LIMIT ? OFFSET ?
-    `, [...params, parseInt(pageSize), offset]);
-    
-    const countResult = await query(`
-      SELECT COUNT(*) as total 
-      FROM products p 
-      ${whereClause}
-    `, params);
-    
-    const total = countResult[0].total;
-    
-    // 处理JSON字段
+      LIMIT ${offset}, ${pageSizeNum}
+    `;
+    console.log('[AdminProducts] where ->', whereClause);
+    const products = await query(listSql);
+
+    const countSql = `
+      SELECT COUNT(*) AS total
+      FROM products p
+      WHERE ${whereClause}
+    `;
+    const countResult = await query(countSql);
+    const total = countResult[0]?.total || 0;
+
     const processedProducts = products.map(product => {
       let images = [];
       let tags = [];
-      
+
       if (product.images) {
         try {
           images = typeof product.images === 'string' ? JSON.parse(product.images) : product.images;
@@ -101,7 +108,7 @@ router.get('/', asyncHandler(async (req, res) => {
           images = [];
         }
       }
-      
+
       if (product.tags) {
         try {
           tags = typeof product.tags === 'string' ? JSON.parse(product.tags) : product.tags;
@@ -109,26 +116,26 @@ router.get('/', asyncHandler(async (req, res) => {
           tags = [];
         }
       }
-      
+
       return {
         ...product,
         images,
         tags
       };
     });
-    
+
     success(res, {
       products: processedProducts,
       pagination: {
-        page: parseInt(page),
-        pageSize: parseInt(pageSize),
+        page: pageNum,
+        pageSize: pageSizeNum,
         total,
-        totalPages: Math.ceil(total / pageSize)
+        totalPages: Math.ceil(total / pageSizeNum)
       }
     }, '获取商品列表成功');
-    
+
   } catch (err) {
-    console.error('获取商品列表失败:', err);
+    console.error('获取商品列表失败:', err && err.stack ? err.stack : err);
     error(res, '获取商品列表失败', 500, err.message);
   }
 }));

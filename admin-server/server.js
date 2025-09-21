@@ -67,7 +67,7 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// 代理API请求到后端服务
+// 通用代理方法（转发到 wx-backend）
 const proxyRequest = async (req, res, endpoint, method = 'GET', data = null) => {
   try {
     const url = `${API_BASE_URL}${endpoint}`;
@@ -79,18 +79,10 @@ const proxyRequest = async (req, res, endpoint, method = 'GET', data = null) => 
         'Content-Type': 'application/json'
       }
     };
-
-    if (data) {
-      config.data = data;
-    }
-
-    // 添加查询参数
-    if (req.query && Object.keys(req.query).length > 0) {
-      config.params = req.query;
-    }
-
+    if (data) config.data = data;
+    if (req.query && Object.keys(req.query).length > 0) config.params = req.query;
     const response = await axios(config);
-    res.json(response.data);
+    res.status(response.status).json(response.data);
   } catch (error) {
     console.error('API代理错误:', error.response?.data || error.message);
     res.status(error.response?.status || 500).json({
@@ -101,262 +93,68 @@ const proxyRequest = async (req, res, endpoint, method = 'GET', data = null) => 
   }
 };
 
-// 管理员登录
+// 管理员登录（若 wx-backend 尚未实现，可临时保留本地校验；默认转发到后端）
 app.post('/api/admin/login', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    
-    // 这里应该调用后端API进行真实登录
-    // 为了演示，我们使用模拟登录
-    if (username === 'admin' && password === 'admin123') {
-      // 生成模拟token
-      const token = 'admin_token_' + Date.now();
-      
-      res.json({
-        success: true,
-        message: '登录成功',
-        data: {
-          token,
-          user: {
-            id: 1,
-            username: 'admin',
-            role: 'admin'
-          }
-        }
-      });
-    } else {
-      res.status(401).json({
-        success: false,
-        message: '用户名或密码错误'
-      });
-    }
-  } catch (error) {
-    console.error('登录错误:', error);
-    res.status(500).json({
-      success: false,
-      message: '登录失败'
-    });
-  }
+  return proxyRequest(req, res, '/admin/login', 'POST', req.body);
 });
 
-// 获取仪表盘数据
+// 仪表盘数据（尝试从后端聚合；若后端无该接口，可在后端实现或前端降级）
 app.get('/api/admin/dashboard', async (req, res) => {
-  try {
-    // 模拟仪表盘数据
-    const dashboardData = {
-      totalProducts: 156,
-      totalOrders: 1234,
-      totalCategories: 12,
-      totalBanners: 5,
-      recentOrders: [
-        { id: 1, orderNo: 'ML202501190001', amount: 999.00, status: 'pending', createdAt: '2025-01-19 10:30:00' },
-        { id: 2, orderNo: 'ML202501190002', amount: 1299.00, status: 'completed', createdAt: '2025-01-19 09:15:00' }
-      ]
-    };
-    
-    res.json({
-      success: true,
-      data: dashboardData
-    });
-  } catch (error) {
-    console.error('获取仪表盘数据错误:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取仪表盘数据失败'
-    });
-  }
+  return proxyRequest(req, res, '/admin/dashboard', 'GET');
 });
 
-// 商品管理API代理
-app.get('/api/admin/products', (req, res) => {
-  proxyRequest(req, res, '/admin/products');
-});
-
-app.get('/api/admin/products/:id', (req, res) => {
-  proxyRequest(req, res, `/admin/products/${req.params.id}`);
-});
-
+// 商品管理（代理到 wx-backend）
+app.get('/api/admin/products', (req, res) => proxyRequest(req, res, '/admin/products'));
+app.get('/api/admin/products/:id', (req, res) => proxyRequest(req, res, `/admin/products/${req.params.id}`));
 app.post('/api/admin/products', upload.single('image'), async (req, res) => {
-  try {
-    // 处理文件上传
-    const formData = { ...req.body };
-    if (req.file) {
-      formData.image = `/uploads/${req.file.filename}`;
-    }
-    
-    // 转发到后端API
-    const response = await axios.post(`${API_BASE_URL}/admin/products`, formData, {
-      headers: {
-        'Authorization': req.headers.authorization || '',
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    res.json(response.data);
-  } catch (error) {
-    console.error('创建商品错误:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      success: false,
-      message: error.response?.data?.message || '创建商品失败',
-      error: error.message
-    });
-  }
+  const formData = { ...req.body };
+  if (req.file) formData.image = `/uploads/${req.file.filename}`;
+  return proxyRequest(req, res, '/admin/products', 'POST', formData);
 });
-
 app.put('/api/admin/products/:id', upload.single('image'), async (req, res) => {
-  try {
-    const formData = { ...req.body };
-    if (req.file) {
-      formData.image = `/uploads/${req.file.filename}`;
-    }
-    
-    const response = await axios.put(`${API_BASE_URL}/admin/products/${req.params.id}`, formData, {
-      headers: {
-        'Authorization': req.headers.authorization || '',
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    res.json(response.data);
-  } catch (error) {
-    console.error('更新商品错误:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      success: false,
-      message: error.response?.data?.message || '更新商品失败',
-      error: error.message
-    });
-  }
+  const formData = { ...req.body };
+  if (req.file) formData.image = `/uploads/${req.file.filename}`;
+  return proxyRequest(req, res, `/admin/products/${req.params.id}`, 'PUT', formData);
 });
+app.delete('/api/admin/products/:id', (req, res) => proxyRequest(req, res, `/admin/products/${req.params.id}`, 'DELETE'));
 
-app.delete('/api/admin/products/:id', (req, res) => {
-  proxyRequest(req, res, `/admin/products/${req.params.id}`, 'DELETE');
-});
-
-// 分类管理API代理
-app.get('/api/admin/categories', (req, res) => {
-  proxyRequest(req, res, '/admin/categories');
-});
-
-app.get('/api/admin/categories/:id', (req, res) => {
-  proxyRequest(req, res, `/admin/categories/${req.params.id}`);
-});
-
+// 分类管理（代理）
+app.get('/api/admin/categories', (req, res) => proxyRequest(req, res, '/admin/categories'));
+app.get('/api/admin/categories/:id', (req, res) => proxyRequest(req, res, `/admin/categories/${req.params.id}`));
 app.post('/api/admin/categories', upload.single('icon'), async (req, res) => {
-  try {
-    const formData = { ...req.body };
-    if (req.file) {
-      formData.icon = `/uploads/${req.file.filename}`;
-    }
-    
-    const response = await axios.post(`${API_BASE_URL}/admin/categories`, formData, {
-      headers: {
-        'Authorization': req.headers.authorization || '',
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    res.json(response.data);
-  } catch (error) {
-    console.error('创建分类错误:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      success: false,
-      message: error.response?.data?.message || '创建分类失败',
-      error: error.message
-    });
-  }
+  const formData = { ...req.body };
+  if (req.file) formData.icon = `/uploads/${req.file.filename}`;
+  return proxyRequest(req, res, '/admin/categories', 'POST', formData);
 });
-
 app.put('/api/admin/categories/:id', upload.single('icon'), async (req, res) => {
-  try {
-    const formData = { ...req.body };
-    if (req.file) {
-      formData.icon = `/uploads/${req.file.filename}`;
-    }
-    
-    const response = await axios.put(`${API_BASE_URL}/admin/categories/${req.params.id}`, formData, {
-      headers: {
-        'Authorization': req.headers.authorization || '',
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    res.json(response.data);
-  } catch (error) {
-    console.error('更新分类错误:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      success: false,
-      message: error.response?.data?.message || '更新分类失败',
-      error: error.message
-    });
-  }
+  const formData = { ...req.body };
+  if (req.file) formData.icon = `/uploads/${req.file.filename}`;
+  return proxyRequest(req, res, `/admin/categories/${req.params.id}`, 'PUT', formData);
 });
+app.delete('/api/admin/categories/:id', (req, res) => proxyRequest(req, res, `/admin/categories/${req.params.id}`, 'DELETE'));
 
-app.delete('/api/admin/categories/:id', (req, res) => {
-  proxyRequest(req, res, `/admin/categories/${req.params.id}`, 'DELETE');
-});
-
-// 轮播图管理API代理
-app.get('/api/admin/banners', (req, res) => {
-  proxyRequest(req, res, '/admin/banners');
-});
-
-app.get('/api/admin/banners/:id', (req, res) => {
-  proxyRequest(req, res, `/admin/banners/${req.params.id}`);
-});
-
+// 轮播图管理（代理）
+app.get('/api/admin/banners', (req, res) => proxyRequest(req, res, '/admin/banners'));
+app.get('/api/admin/banners/:id', (req, res) => proxyRequest(req, res, `/admin/banners/${req.params.id}`));
 app.post('/api/admin/banners', upload.single('image'), async (req, res) => {
-  try {
-    const formData = { ...req.body };
-    if (req.file) {
-      formData.image = `/uploads/${req.file.filename}`;
-    }
-    
-    const response = await axios.post(`${API_BASE_URL}/admin/banners`, formData, {
-      headers: {
-        'Authorization': req.headers.authorization || '',
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    res.json(response.data);
-  } catch (error) {
-    console.error('创建轮播图错误:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      success: false,
-      message: error.response?.data?.message || '创建轮播图失败',
-      error: error.message
-    });
-  }
+  const formData = { ...req.body };
+  if (req.file) formData.image = `/uploads/${req.file.filename}`;
+  return proxyRequest(req, res, '/admin/banners', 'POST', formData);
 });
-
 app.put('/api/admin/banners/:id', upload.single('image'), async (req, res) => {
-  try {
-    const formData = { ...req.body };
-    if (req.file) {
-      formData.image = `/uploads/${req.file.filename}`;
-    }
-    
-    const response = await axios.put(`${API_BASE_URL}/admin/banners/${req.params.id}`, formData, {
-      headers: {
-        'Authorization': req.headers.authorization || '',
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    res.json(response.data);
-  } catch (error) {
-    console.error('更新轮播图错误:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      success: false,
-      message: error.response?.data?.message || '更新轮播图失败',
-      error: error.message
-    });
-  }
+  const formData = { ...req.body };
+  if (req.file) formData.image = `/uploads/${req.file.filename}`;
+  return proxyRequest(req, res, `/admin/banners/${req.params.id}`, 'PUT', formData);
 });
+app.delete('/api/admin/banners/:id', (req, res) => proxyRequest(req, res, `/admin/banners/${req.params.id}`, 'DELETE'));
 
-app.delete('/api/admin/banners/:id', (req, res) => {
-  proxyRequest(req, res, `/admin/banners/${req.params.id}`, 'DELETE');
-});
+// 订单（代理，如无则后端补齐）
+app.get('/api/admin/orders', (req, res) => proxyRequest(req, res, '/admin/orders'));
+
+// 用户资料与密码（代理，如无则后端补齐）
+app.get('/api/admin/profile', (req, res) => proxyRequest(req, res, '/admin/profile'));
+app.put('/api/admin/profile', (req, res) => proxyRequest(req, res, '/admin/profile', 'PUT', req.body));
+app.post('/api/admin/change-password', (req, res) => proxyRequest(req, res, '/admin/change-password', 'POST', req.body));
 
 // 文件上传服务
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
