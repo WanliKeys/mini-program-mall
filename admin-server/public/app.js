@@ -290,14 +290,69 @@ async function loadDashboard() {
         const data = await response.json();
         
         if (data.success) {
+            // 更新统计数字
             document.getElementById('total-products').textContent = data.data.totalProducts;
             document.getElementById('total-orders').textContent = data.data.totalOrders;
             document.getElementById('total-categories').textContent = data.data.totalCategories;
             document.getElementById('total-banners').textContent = data.data.totalBanners;
+            
+            // 渲染最近订单
+            renderRecentOrders(data.data.recentOrders);
         }
     } catch (error) {
         console.error('加载仪表盘数据失败:', error);
+        // 显示错误状态
+        const tbody = document.getElementById('recent-orders');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">加载失败，请刷新重试</td></tr>';
+        }
     }
+}
+
+// 渲染最近订单
+function renderRecentOrders(orders) {
+    const tbody = document.getElementById('recent-orders');
+    if (!tbody) return;
+    
+    if (!orders || orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无订单数据</td></tr>';
+        return;
+    }
+    
+    const statusMap = {
+        'pending': { text: '待支付', class: 'status-pending' },
+        'paid': { text: '已支付', class: 'status-paid' },
+        'shipped': { text: '已发货', class: 'status-shipped' },
+        'completed': { text: '已完成', class: 'status-completed' },
+        'cancelled': { text: '已取消', class: 'status-cancelled' }
+    };
+    
+    tbody.innerHTML = orders.map(order => {
+        const status = statusMap[order.status] || { text: order.status, class: 'status-unknown' };
+        const createdAt = new Date(order.createdAt).toLocaleString('zh-CN');
+        
+        return `
+            <tr>
+                <td>${order.orderNo}</td>
+                <td>用户${order.id}</td>
+                <td>¥${parseFloat(order.amount).toFixed(2)}</td>
+                <td><span class="status-badge ${status.class}">${status.text}</span></td>
+                <td>${createdAt}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline" onclick="viewOrder(${order.id})">
+                        查看
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// 查看订单详情
+function viewOrder(orderId) {
+    // 这里可以跳转到订单详情页面或打开模态框
+    console.log('查看订单:', orderId);
+    showMessage(`查看订单 ${orderId} 的详情`, 'info');
 }
 
 // 加载商品列表
