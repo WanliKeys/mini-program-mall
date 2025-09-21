@@ -62,6 +62,125 @@ router.get('/orders', adminAuth, asyncHandler(async (req, res) => {
   return success(res, orders, '获取订单列表成功');
 }));
 
+// 订单详情（管理员）
+router.get('/orders/:id', adminAuth, asyncHandler(async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.id, 10);
+    if (Number.isNaN(orderId)) {
+      return error(res, '订单ID不合法', 400);
+    }
+
+    // 查询订单基本信息
+    const orders = await query(
+      'SELECT * FROM orders WHERE id = ? LIMIT 1',
+      [orderId]
+    );
+    if (orders.length === 0) {
+      return error(res, '订单不存在', 404);
+    }
+    const order = orders[0];
+
+    // 查询订单商品项
+    const items = await query(
+      `SELECT oi.id, oi.product_id, oi.product_name, oi.product_image, oi.product_price, oi.quantity, oi.subtotal
+       FROM order_items oi
+       WHERE oi.order_id = ?`,
+      [orderId]
+    );
+
+    // 查询收货地址
+    let address = null;
+    if (order.address_id) {
+      const addresses = await query(
+        'SELECT * FROM addresses WHERE id = ? LIMIT 1',
+        [order.address_id]
+      );
+      if (addresses.length > 0) {
+        address = addresses[0];
+      }
+    }
+
+    // 组装返回数据
+    const orderDetail = {
+      id: order.id,
+      orderNo: order.order_no,
+      userId: order.user_id,
+      addressId: order.address_id,
+      totalAmount: order.total_amount,
+      paymentMethod: order.payment_method,
+      status: order.status,
+      remark: order.remark,
+      externalOrderNo: order.external_order_no,
+      source: order.source,
+      externalSource: order.external_source,
+      paidAt: order.paid_at,
+      shippedAt: order.shipped_at,
+      completedAt: order.completed_at,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at,
+      items: items,
+      address: address
+    };
+
+    return success(res, orderDetail, '获取订单详情成功');
+  } catch (err) {
+    console.error('获取订单详情失败:', err);
+    return error(res, '获取订单详情失败', 500, err.message);
+  }
+}));
+
+// 更新订单状态（管理员）
+router.put('/orders/:id/status', adminAuth, asyncHandler(async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.id, 10);
+    const { status } = req.body;
+    
+    if (Number.isNaN(orderId)) {
+      return error(res, '订单ID不合法', 400);
+    }
+    
+    if (!status) {
+      return error(res, '状态不能为空', 400);
+    }
+    
+    const validStatuses = ['pending', 'paid', 'shipped', 'completed', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return error(res, '无效的订单状态', 400);
+    }
+    
+    // 检查订单是否存在
+    const orders = await query('SELECT * FROM orders WHERE id = ? LIMIT 1', [orderId]);
+    if (orders.length === 0) {
+      return error(res, '订单不存在', 404);
+    }
+    
+    // 更新订单状态
+    const updateFields = ['status = ?', 'updated_at = NOW()'];
+    const updateValues = [status];
+    
+    // 根据状态设置相应的时间字段
+    if (status === 'paid' && !orders[0].paid_at) {
+      updateFields.push('paid_at = NOW()');
+    } else if (status === 'shipped' && !orders[0].shipped_at) {
+      updateFields.push('shipped_at = NOW()');
+    } else if (status === 'completed' && !orders[0].completed_at) {
+      updateFields.push('completed_at = NOW()');
+    }
+    
+    updateValues.push(orderId);
+    
+    await query(
+      `UPDATE orders SET ${updateFields.join(', ')} WHERE id = ?`,
+      updateValues
+    );
+    
+    return success(res, null, '订单状态更新成功');
+  } catch (err) {
+    console.error('更新订单状态失败:', err);
+    return error(res, '更新订单状态失败', 500, err.message);
+  }
+}));
+
 module.exports = router;
 
 

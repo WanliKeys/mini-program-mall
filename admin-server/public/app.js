@@ -349,10 +349,199 @@ function renderRecentOrders(orders) {
 }
 
 // 查看订单详情
-function viewOrder(orderId) {
-    // 这里可以跳转到订单详情页面或打开模态框
-    console.log('查看订单:', orderId);
-    showMessage(`查看订单 ${orderId} 的详情`, 'info');
+async function viewOrder(orderId) {
+    try {
+        console.log('查看订单:', orderId);
+        
+        // 显示加载状态
+        showMessage('正在加载订单详情...', 'info');
+        
+        // 请求订单详情
+        const response = await fetch(`${API_BASE}/admin/orders/${orderId}`, {
+            headers: {
+                'Authorization': `Bearer ${currentToken}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('获取订单详情失败');
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showOrderDetailModal(data.data);
+        } else {
+            throw new Error(data.message || '获取订单详情失败');
+        }
+    } catch (error) {
+        console.error('查看订单详情失败:', error);
+        showMessage('获取订单详情失败: ' + error.message, 'error');
+    }
+}
+
+// 显示订单详情模态框
+function showOrderDetailModal(order) {
+    // 创建模态框HTML
+    const modalHtml = `
+        <div id="order-detail-modal" class="modal-overlay" onclick="closeOrderModal(event)">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h3>订单详情 - ${order.orderNo}</h3>
+                    <button class="modal-close" onclick="closeOrderModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="order-info-grid">
+                        <div class="info-group">
+                            <label>订单号:</label>
+                            <span>${order.orderNo}</span>
+                        </div>
+                        <div class="info-group">
+                            <label>订单状态:</label>
+                            <span class="status-badge status-${order.status}">${getStatusText(order.status)}</span>
+                        </div>
+                        <div class="info-group">
+                            <label>订单金额:</label>
+                            <span class="amount">¥${parseFloat(order.totalAmount).toFixed(2)}</span>
+                        </div>
+                        <div class="info-group">
+                            <label>支付方式:</label>
+                            <span>${getPaymentMethodText(order.paymentMethod)}</span>
+                        </div>
+                        <div class="info-group">
+                            <label>创建时间:</label>
+                            <span>${new Date(order.createdAt).toLocaleString('zh-CN')}</span>
+                        </div>
+                        ${order.paidAt ? `
+                        <div class="info-group">
+                            <label>支付时间:</label>
+                            <span>${new Date(order.paidAt).toLocaleString('zh-CN')}</span>
+                        </div>
+                        ` : ''}
+                        ${order.remark ? `
+                        <div class="info-group full-width">
+                            <label>备注:</label>
+                            <span>${order.remark}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                    
+                    ${order.items && order.items.length > 0 ? `
+                    <div class="order-items-section">
+                        <h4>订单商品</h4>
+                        <div class="items-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>商品名称</th>
+                                        <th>单价</th>
+                                        <th>数量</th>
+                                        <th>小计</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${order.items.map(item => `
+                                        <tr>
+                                            <td>${item.product_name || item.productName || '未知商品'}</td>
+                                            <td>¥${parseFloat(item.product_price || item.productPrice || 0).toFixed(2)}</td>
+                                            <td>${item.quantity || 0}</td>
+                                            <td>¥${parseFloat(item.subtotal || 0).toFixed(2)}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    ${order.address ? `
+                    <div class="order-address-section">
+                        <h4>收货地址</h4>
+                        <div class="address-info">
+                            <p><strong>收货人：</strong>${order.address.name}</p>
+                            <p><strong>联系电话：</strong>${order.address.phone}</p>
+                            <p><strong>收货地址：</strong>${order.address.province} ${order.address.city} ${order.address.district} ${order.address.detail}</p>
+                            ${order.address.tag ? `<p><strong>地址标签：</strong>${order.address.tag}</p>` : ''}
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeOrderModal()">关闭</button>
+                    ${order.status === 'pending' ? `
+                    <button class="btn btn-primary" onclick="updateOrderStatus(${order.id}, 'paid')">标记为已支付</button>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // 添加到页面
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// 获取状态文本
+function getStatusText(status) {
+    const statusMap = {
+        'pending': '待支付',
+        'paid': '已支付',
+        'shipped': '已发货',
+        'completed': '已完成',
+        'cancelled': '已取消'
+    };
+    return statusMap[status] || status;
+}
+
+// 获取支付方式文本
+function getPaymentMethodText(method) {
+    const methodMap = {
+        'wechat': '微信支付',
+        'alipay': '支付宝',
+        'bank': '银行卡',
+        'cash': '现金'
+    };
+    return methodMap[method] || method || '微信支付';
+}
+
+// 关闭订单详情模态框
+function closeOrderModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    const modal = document.getElementById('order-detail-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// 更新订单状态
+async function updateOrderStatus(orderId, newStatus) {
+    try {
+        const response = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${currentToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: newStatus })
+        });
+        
+        if (!response.ok) {
+            throw new Error('更新订单状态失败');
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage('订单状态更新成功', 'success');
+            closeOrderModal();
+            // 刷新仪表盘数据
+            loadDashboard();
+        } else {
+            throw new Error(data.message || '更新订单状态失败');
+        }
+    } catch (error) {
+        console.error('更新订单状态失败:', error);
+        showMessage('更新订单状态失败: ' + error.message, 'error');
+    }
 }
 
 // 加载商品列表

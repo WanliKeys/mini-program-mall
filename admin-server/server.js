@@ -150,6 +150,8 @@ app.delete('/api/admin/banners/:id', (req, res) => proxyRequest(req, res, `/admi
 
 // 订单（代理，如无则后端补齐）
 app.get('/api/admin/orders', (req, res) => proxyRequest(req, res, '/admin/orders'));
+app.get('/api/admin/orders/:id', (req, res) => proxyRequest(req, res, `/admin/orders/${req.params.id}`));
+app.put('/api/admin/orders/:id/status', (req, res) => proxyRequest(req, res, `/admin/orders/${req.params.id}/status`, 'PUT', req.body));
 
 // 用户资料与密码（代理，如无则后端补齐）
 app.get('/api/admin/profile', (req, res) => proxyRequest(req, res, '/admin/profile'));
