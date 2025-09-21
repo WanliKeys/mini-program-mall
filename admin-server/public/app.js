@@ -80,6 +80,9 @@ function bindEvents() {
         previewImage(e.target, 'product-image-preview');
     });
     
+    // 自定义下拉框
+    initCustomDropdowns();
+    
     document.getElementById('category-icon').addEventListener('change', function(e) {
         previewImage(e.target, 'category-icon-preview');
     });
@@ -273,6 +276,10 @@ function loadPageData(pageName) {
         case 'products':
             loadProducts();
             loadCategories();
+            // 重新初始化自定义下拉框
+            setTimeout(() => {
+                initCustomDropdowns();
+            }, 100);
             break;
         case 'categories':
             loadCategories();
@@ -512,6 +519,120 @@ function getPaymentMethodText(method) {
     return methodMap[method] || method || '微信支付';
 }
 
+// 初始化自定义下拉框
+function initCustomDropdowns() {
+    // 为所有自定义下拉框添加事件监听
+    const dropdowns = document.querySelectorAll('.custom-dropdown');
+    console.log('初始化自定义下拉框，找到', dropdowns.length, '个下拉框');
+    
+    dropdowns.forEach(dropdown => {
+        const trigger = dropdown.querySelector('.dropdown-trigger');
+        const menu = dropdown.querySelector('.dropdown-menu');
+        const items = dropdown.querySelectorAll('.dropdown-item');
+        
+        if (!trigger || !menu) {
+            console.warn('下拉框元素不完整:', dropdown);
+            return;
+        }
+        
+        // 移除之前的事件监听器（如果存在）
+        const newTrigger = trigger.cloneNode(true);
+        trigger.parentNode.replaceChild(newTrigger, trigger);
+        
+        // 点击触发器切换菜单显示
+        newTrigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            console.log('点击下拉框触发器');
+            toggleDropdown(dropdown);
+        });
+        
+        // 点击选项
+        items.forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.stopPropagation();
+                console.log('点击下拉框选项:', item.textContent);
+                selectDropdownItem(dropdown, item);
+            });
+        });
+    });
+    
+    // 点击页面其他地方关闭下拉框（只绑定一次）
+    if (!window.dropdownClickHandler) {
+        window.dropdownClickHandler = function() {
+            closeAllDropdowns();
+        };
+        document.addEventListener('click', window.dropdownClickHandler);
+    }
+}
+
+// 切换下拉框显示状态
+function toggleDropdown(dropdown) {
+    const isOpen = dropdown.querySelector('.dropdown-menu').classList.contains('show');
+    
+    // 先关闭所有其他下拉框
+    closeAllDropdowns();
+    
+    if (!isOpen) {
+        const menu = dropdown.querySelector('.dropdown-menu');
+        const trigger = dropdown.querySelector('.dropdown-trigger');
+        
+        menu.classList.add('show');
+        trigger.classList.add('active');
+    }
+}
+
+// 选择下拉框选项
+function selectDropdownItem(dropdown, item) {
+    const menu = dropdown.querySelector('.dropdown-menu');
+    const trigger = dropdown.querySelector('.dropdown-trigger');
+    const text = dropdown.querySelector('.dropdown-text');
+    const value = item.getAttribute('data-value');
+    const label = item.querySelector('span').textContent;
+    
+    // 更新选中状态
+    menu.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+    
+    // 更新触发器文本
+    text.textContent = label;
+    
+    // 关闭菜单
+    menu.classList.remove('show');
+    trigger.classList.remove('active');
+    
+    // 触发change事件，模拟原生select的行为
+    const changeEvent = new Event('change', { bubbles: true });
+    dropdown.dispatchEvent(changeEvent);
+    
+    // 根据下拉框ID执行相应操作
+    const dropdownId = dropdown.id;
+    if (dropdownId === 'category-dropdown') {
+        loadProducts(); // 重新加载商品列表
+    } else if (dropdownId === 'status-dropdown') {
+        loadProducts(); // 重新加载商品列表
+    }
+}
+
+// 关闭所有下拉框
+function closeAllDropdowns() {
+    document.querySelectorAll('.custom-dropdown').forEach(dropdown => {
+        const menu = dropdown.querySelector('.dropdown-menu');
+        const trigger = dropdown.querySelector('.dropdown-trigger');
+        
+        menu.classList.remove('show');
+        trigger.classList.remove('active');
+    });
+}
+
+// 获取下拉框选中的值
+function getDropdownValue(dropdownId) {
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return '';
+    
+    const activeItem = dropdown.querySelector('.dropdown-item.active');
+    return activeItem ? activeItem.getAttribute('data-value') : '';
+}
+
 // 关闭订单详情模态框
 function closeOrderModal(event) {
     if (event && event.target !== event.currentTarget) return;
@@ -559,7 +680,22 @@ async function loadProducts(page = 1) {
     tbody.innerHTML = '<tr><td colspan="8" class="text-center"><div class="loading show"><div class="spinner-border" role="status"><span class="visually-hidden">加载中...</span></div></div></td></tr>';
     
     try {
-        const response = await fetch(`${API_BASE}/admin/products?page=${page}&pageSize=10`, {
+        // 获取筛选条件
+        const categoryId = getDropdownValue('category-dropdown');
+        const status = getDropdownValue('status-dropdown');
+        const keyword = document.getElementById('product-search')?.value || '';
+        
+        // 构建查询参数
+        const params = new URLSearchParams({
+            page: page,
+            pageSize: 10
+        });
+        
+        if (categoryId) params.append('categoryId', categoryId);
+        if (status) params.append('status', status);
+        if (keyword) params.append('keyword', keyword);
+        
+        const response = await fetch(`${API_BASE}/admin/products?${params.toString()}`, {
             headers: {
                 'Authorization': `Bearer ${currentToken}`,
                 'Content-Type': 'application/json'
@@ -717,10 +853,32 @@ function renderCategoriesTable(categories) {
 
 // 更新分类筛选下拉框
 function updateCategoryFilter(categories) {
-    const select = document.getElementById('category-filter');
-    if (select) {
-        select.innerHTML = '<option value="">所有分类</option>' + 
-            categories.map(category => `<option value="${category.id}">${category.name}</option>`).join('');
+    // 更新自定义分类下拉框
+    const categoryDropdown = document.getElementById('category-dropdown');
+    if (categoryDropdown) {
+        const menu = categoryDropdown.querySelector('.dropdown-menu');
+        menu.innerHTML = `
+            <div class="dropdown-item active" data-value="">
+                <i class="bi bi-check"></i>
+                <span>所有分类</span>
+            </div>
+            ${categories.map(category => `
+                <div class="dropdown-item" data-value="${category.id}">
+                    <i class="bi bi-check"></i>
+                    <span>${category.name}</span>
+                </div>
+            `).join('')}
+        `;
+        
+        // 重新绑定事件
+        const items = menu.querySelectorAll('.dropdown-item');
+        items.forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.stopPropagation();
+                console.log('点击分类选项:', item.textContent);
+                selectDropdownItem(categoryDropdown, item);
+            });
+        });
     }
     
     // 同时更新商品表单的分类选择
