@@ -33,12 +33,20 @@ document.addEventListener('DOMContentLoaded', function() {
 // 验证token有效性
 async function validateToken() {
     try {
+        console.log('验证token有效性, currentToken:', currentToken ? 'exists' : 'null');
         const response = await fetch(`${API_BASE}/admin/dashboard`, {
             headers: {
                 'Authorization': `Bearer ${currentToken}`
             }
         });
-        return response.ok;
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Token验证失败:', response.status, errorData);
+            return false;
+        }
+        
+        return true;
     } catch (error) {
         console.error('Token验证失败:', error);
         return false;
@@ -273,6 +281,7 @@ function loadPageData(pageName) {
             loadBanners();
             break;
         case 'orders':
+            console.log('Switching to orders page, calling loadOrders()');
             loadOrders();
             break;
     }
@@ -788,28 +797,84 @@ function renderBannersTable(banners) {
 }
 
 // 加载订单列表
-async function loadOrders() {
+async function loadOrders(page = 1, pageSize = 10) {
     const tbody = document.getElementById('orders-table');
     tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="loading show"><div class="spinner-border" role="status"><span class="visually-hidden">加载中...</span></div></div></td></tr>';
     
+    // 调试信息
+    console.log('loadOrders called, currentToken:', currentToken ? 'exists' : 'null');
+    
+    // 检查token是否存在
+    if (!currentToken) {
+        console.error('No token found, redirecting to login');
+        showPage('login');
+        return;
+    }
+    
     try {
-        // 这里应该调用订单API，暂时显示模拟数据
-        tbody.innerHTML = `
-            <tr>
-                <td>ML202501190001</td>
-                <td>用户001</td>
-                <td>¥999.00</td>
-                <td><span class="badge bg-warning">待付款</span></td>
-                <td>2025-01-19 10:30:00</td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary">查看</button>
-                </td>
-            </tr>
-        `;
+        const response = await fetch(`${API_BASE}/admin/orders?page=${page}&pageSize=${pageSize}`, {
+            headers: {
+                'Authorization': `Bearer ${currentToken}`
+            }
+        });
+        
+        console.log('API response status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API error response:', errorText);
+            
+            // 如果是401错误，说明token无效，跳转到登录页
+            if (response.status === 401) {
+                console.error('Token无效，跳转到登录页');
+                currentToken = null;
+                localStorage.removeItem('admin_token');
+                showPage('login');
+                return;
+            }
+            
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('API response data:', data);
+        
+        if (data.success) {
+            renderOrdersTable(data.data || []);
+            // 更新分页信息
+            if (data.pagination) {
+                renderPagination(data.pagination, 'orders');
+            }
+        } else {
+            throw new Error(data.message || '获取订单列表失败');
+        }
     } catch (error) {
         console.error('加载订单列表失败:', error);
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">加载失败</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">加载失败: ${error.message}</td></tr>`;
     }
+}
+
+// 渲染订单表格
+function renderOrdersTable(orders) {
+    const tbody = document.getElementById('orders-table');
+    
+    if (!orders || orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无订单数据</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = orders.map(order => `
+        <tr>
+            <td>${order.orderNo || order.orderNumber || order.id}</td>
+            <td>${order.userName || order.user_name || '未知用户'}</td>
+            <td>¥${parseFloat(order.amount || order.totalAmount || order.total_amount || 0).toFixed(2)}</td>
+            <td><span class="status-badge status-${order.status}">${getStatusText(order.status)}</span></td>
+            <td>${new Date(order.createdAt || order.created_at).toLocaleString('zh-CN')}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" onclick="viewOrder(${order.id})">查看</button>
+            </td>
+        </tr>
+    `).join('');
 }
 
 // 渲染分页
