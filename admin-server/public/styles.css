@@ -1042,27 +1042,35 @@ body {
 
 .action-btn {
     padding: 6px 12px;
-    border: 1px solid var(--border-color);
-    background: transparent;
-    color: var(--text-secondary);
+    border: 1px solid #d9d9d9;
+    background: #fff;
+    color: #666;
     border-radius: var(--border-radius);
-    font-size: var(--font-size-xs);
+    font-size: 12px;
     cursor: pointer;
     transition: all 0.3s;
     display: flex;
     align-items: center;
     gap: 4px;
+    min-width: 60px;
+    justify-content: center;
 }
 
 .action-btn:hover {
-    background: var(--primary-color);
+    background: #1890ff;
     color: #fff;
-    border-color: var(--primary-color);
+    border-color: #1890ff;
+}
+
+.action-btn.danger {
+    color: #ff4d4f;
+    border-color: #ff4d4f;
 }
 
 .action-btn.danger:hover {
-    background: var(--danger-color);
-    border-color: var(--danger-color);
+    background: #ff4d4f;
+    color: #fff;
+    border-color: #ff4d4f;
 }
 
 /* 分页 */
@@ -1193,12 +1201,15 @@ body {
 }
 
 .modal-container {
-    width: 420px;
+    width: 600px;
     max-width: 90vw;
+    max-height: 90vh;
     background: #fff;
     border-radius: 12px;
     box-shadow: var(--shadow-lg);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .modal-header {
@@ -1226,6 +1237,9 @@ body {
 .modal-body {
     padding: 20px;
     color: var(--text-primary);
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(90vh - 120px);
 }
 
 .modal-footer {
@@ -1233,6 +1247,8 @@ body {
     justify-content: flex-end;
     gap: 12px;
     padding: 12px 20px 20px;
+    flex-shrink: 0;
+    border-top: 1px solid #f0f0f0;
 }
 
 .empty-state .empty-icon {
@@ -1462,6 +1478,52 @@ body {
     .content-area {
         padding: 16px;
     }
+}
+
+/* 表单样式 */
+.form-row {
+    display: flex;
+    gap: 16px;
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d9d9d9;
+    border-radius: var(--border-radius);
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.image-preview {
+    margin-top: 8px;
+}
+
+.image-preview img {
+    border-radius: var(--border-radius);
+    border: 1px solid #f0f0f0;
 }
 
 /* 工具类 */

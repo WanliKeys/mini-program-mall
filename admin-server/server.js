@@ -4,6 +4,7 @@ const path = require('path');
 const multer = require('multer');
 const axios = require('axios');
 const compression = require('compression');
+const FormData = require('form-data');
 require('dotenv').config();
 
 const app = express();
@@ -118,6 +119,34 @@ app.put('/api/admin/products/:id', upload.single('image'), async (req, res) => {
 });
 app.delete('/api/admin/products/:id', (req, res) => proxyRequest(req, res, `/admin/products/${req.params.id}`, 'DELETE'));
 
+// 商品图片上传 - 直接代理multipart请求到后端
+app.post('/api/admin/products/upload-image', (req, res) => {
+  // 直接转发multipart请求到后端
+  const url = `${API_BASE_URL}/admin/products/upload-image`;
+  
+  // 使用axios直接转发请求
+  axios({
+    method: 'POST',
+    url: url,
+    headers: {
+      'Authorization': req.headers.authorization || '',
+      'Content-Type': req.headers['content-type'] || 'multipart/form-data'
+    },
+    data: req, // 直接传递原始请求流
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity
+  }).then(response => {
+    res.status(response.status).json(response.data);
+  }).catch(error => {
+    console.error('图片上传代理错误:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      success: false,
+      message: '图片上传失败',
+      error: error.message
+    });
+  });
+});
+
 // 分类管理（代理）
 app.get('/api/admin/categories', (req, res) => proxyRequest(req, res, '/admin/categories'));
 app.get('/api/admin/categories/:id', (req, res) => proxyRequest(req, res, `/admin/categories/${req.params.id}`));
@@ -158,8 +187,8 @@ app.get('/api/admin/profile', (req, res) => proxyRequest(req, res, '/admin/profi
 app.put('/api/admin/profile', (req, res) => proxyRequest(req, res, '/admin/profile', 'PUT', req.body));
 app.post('/api/admin/change-password', (req, res) => proxyRequest(req, res, '/admin/change-password', 'POST', req.body));
 
-// 文件上传服务
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// 文件上传服务 - 代理到后端的uploads目录
+app.use('/uploads', express.static(path.join(__dirname, '../wx-backend/uploads')));
 
 // 健康检查
 app.get('/health', (req, res) => {

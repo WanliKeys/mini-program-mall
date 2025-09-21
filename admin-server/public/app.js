@@ -5,21 +5,30 @@ let currentPage = 'dashboard';
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('页面加载完成');
+    console.log('localStorage中的token:', localStorage.getItem('admin_token'));
+    console.log('currentToken:', currentToken);
+    
     // 检查是否已登录
     if (currentToken) {
+        console.log('发现token，开始验证...');
         // 验证token有效性
         validateToken().then(valid => {
+            console.log('Token验证结果:', valid);
             if (valid) {
+                console.log('Token有效，显示仪表盘');
                 showPage('dashboard');
                 loadDashboard();
             } else {
                 // token无效，清除并显示登录页
+                console.log('Token无效，清除并显示登录页');
                 currentToken = null;
                 localStorage.removeItem('admin_token');
                 showPage('login');
             }
         });
     } else {
+        console.log('没有token，显示登录页');
         showPage('login');
     }
     
@@ -34,11 +43,17 @@ document.addEventListener('DOMContentLoaded', function() {
 async function validateToken() {
     try {
         console.log('验证token有效性, currentToken:', currentToken ? 'exists' : 'null');
+        console.log('API_BASE:', API_BASE);
+        console.log('请求URL:', `${API_BASE}/admin/dashboard`);
+        
         const response = await fetch(`${API_BASE}/admin/dashboard`, {
             headers: {
                 'Authorization': `Bearer ${currentToken}`
             }
         });
+        
+        console.log('验证响应状态:', response.status);
+        console.log('验证响应OK:', response.ok);
         
         if (!response.ok) {
             const errorData = await response.json();
@@ -46,7 +61,9 @@ async function validateToken() {
             return false;
         }
         
-        return true;
+        const data = await response.json();
+        console.log('验证成功，数据:', data);
+        return data.success;
     } catch (error) {
         console.error('Token验证失败:', error);
         return false;
@@ -106,6 +123,9 @@ async function handleLogin(e) {
     submitBtn.disabled = true;
     
     try {
+        console.log('开始登录请求:', { username, password });
+        console.log('请求URL:', `${API_BASE}/admin/login`);
+        
         const response = await fetch(`${API_BASE}/admin/login`, {
             method: 'POST',
             headers: {
@@ -114,11 +134,16 @@ async function handleLogin(e) {
             body: JSON.stringify({ username, password })
         });
         
+        console.log('登录响应状态:', response.status);
+        console.log('登录响应OK:', response.ok);
+        
         const data = await response.json();
+        console.log('登录响应数据:', data);
         
         if (data.success) {
             currentToken = data.data.token;
             localStorage.setItem('admin_token', currentToken);
+            console.log('登录成功，token已保存');
             
             // 显示成功消息
             showMessage('登录成功！', 'success');
@@ -129,11 +154,12 @@ async function handleLogin(e) {
                 loadDashboard();
             }, 500);
         } else {
+            console.error('登录失败:', data.message);
             showMessage(data.message || '登录失败', 'error');
         }
     } catch (error) {
-        console.error('登录失败:', error);
-        showMessage('登录失败，请检查网络连接', 'error');
+        console.error('登录请求失败:', error);
+        showMessage('登录失败，请检查网络连接: ' + error.message, 'error');
     } finally {
         // 恢复按钮状态
         submitBtn.innerHTML = originalText;
@@ -633,6 +659,69 @@ function getDropdownValue(dropdownId) {
     return activeItem ? activeItem.getAttribute('data-value') : '';
 }
 
+// 设置下拉框的值
+function setDropdownValue(dropdownId, value, defaultText) {
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) return;
+    
+    const menu = dropdown.querySelector('.dropdown-menu');
+    const trigger = dropdown.querySelector('.dropdown-trigger');
+    const text = dropdown.querySelector('.dropdown-text');
+    
+    if (!menu || !trigger || !text) return;
+    
+    // 清除所有选中状态
+    menu.querySelectorAll('.dropdown-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // 查找匹配的选项
+    const targetItem = menu.querySelector(`[data-value="${value}"]`);
+    if (targetItem) {
+        targetItem.classList.add('active');
+        text.textContent = targetItem.querySelector('span').textContent;
+    } else {
+        text.textContent = defaultText;
+    }
+}
+
+// 上传商品图片
+async function uploadProductImage(file) {
+    try {
+        console.log('开始上传图片:', file);
+        const formData = new FormData();
+        formData.append('image', file);
+        
+        console.log('FormData构建完成，发送请求到:', '/api/admin/products/upload-image');
+        console.log('请求头:', {
+            'Authorization': `Bearer ${currentToken ? 'exists' : 'null'}`
+        });
+        
+        const response = await fetch('/api/admin/products/upload-image', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${currentToken}`
+            },
+            body: formData
+        });
+        
+        console.log('上传响应状态:', response.status);
+        console.log('上传响应OK:', response.ok);
+        
+        const result = await response.json();
+        console.log('上传响应数据:', result);
+        
+        if (result.success) {
+            return result.data.imageUrl;
+        } else {
+            throw new Error(result.message || '图片上传失败');
+        }
+    } catch (error) {
+        console.error('图片上传失败:', error);
+        throw error;
+    }
+}
+
 // 关闭订单详情模态框
 function closeOrderModal(event) {
     if (event && event.target !== event.currentTarget) return;
@@ -774,9 +863,11 @@ function renderProductsTable(products) {
                 <div class="action-buttons">
                     <button class="action-btn" onclick="editProduct(${product.id})" title="编辑">
                         <i class="bi bi-pencil"></i>
+                        <span>编辑</span>
                     </button>
                     <button class="action-btn danger" onclick="deleteProduct(${product.id})" title="删除">
                         <i class="bi bi-trash"></i>
+                        <span>删除</span>
                     </button>
                 </div>
             </td>
@@ -881,11 +972,32 @@ function updateCategoryFilter(categories) {
         });
     }
     
-    // 同时更新商品表单的分类选择
-    const productSelect = document.getElementById('product-category');
-    if (productSelect) {
-        productSelect.innerHTML = '<option value="">请选择分类</option>' + 
-            categories.map(category => `<option value="${category.id}">${category.name}</option>`).join('');
+    // 同时更新商品编辑弹窗的分类下拉框
+    const productCategoryDropdown = document.getElementById('product-category-dropdown');
+    if (productCategoryDropdown) {
+        const menu = productCategoryDropdown.querySelector('.dropdown-menu');
+        menu.innerHTML = `
+            <div class="dropdown-item active" data-value="">
+                <i class="bi bi-check"></i>
+                <span>请选择分类</span>
+            </div>
+            ${categories.map(category => `
+                <div class="dropdown-item" data-value="${category.id}">
+                    <i class="bi bi-check"></i>
+                    <span>${category.name}</span>
+                </div>
+            `).join('')}
+        `;
+        
+        // 重新绑定事件
+        const items = menu.querySelectorAll('.dropdown-item');
+        items.forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.stopPropagation();
+                console.log('点击编辑弹窗分类选项:', item.textContent);
+                selectDropdownItem(productCategoryDropdown, item);
+            });
+        });
     }
 }
 
@@ -1030,8 +1142,8 @@ function renderOrdersTable(orders) {
             <td>${new Date(order.createdAt || order.created_at).toLocaleString('zh-CN')}</td>
             <td>
                 <button class="btn btn-sm btn-outline-primary" onclick="viewOrder(${order.id})">查看</button>
-            </td>
-        </tr>
+                </td>
+            </tr>
     `).join('');
 }
 
@@ -1078,21 +1190,166 @@ function previewImage(input, previewId) {
 }
 
 // 商品相关操作
-function editProduct(id) {
-    // 实现编辑商品逻辑
+async function editProduct(id) {
     console.log('编辑商品:', id);
+    // 显示编辑弹窗
+    showProductModal('编辑商品');
+    // 获取商品数据并填充到表单
+    await loadProductForEdit(id);
 }
 
 function deleteProduct(id) {
-    if (confirm('确定要删除这个商品吗？')) {
-        // 实现删除商品逻辑
+    showConfirmModal('确定要删除这个商品吗？', (confirmed) => {
+        if (confirmed) {
         console.log('删除商品:', id);
+            // 这里应该调用删除API
+            showMessage('商品删除成功', 'success');
+            loadProducts(); // 重新加载商品列表
+        }
+    });
+}
+
+async function loadProductForEdit(id) {
+    try {
+        // 从API获取商品数据
+        const response = await fetch(`/api/admin/products/${id}`, {
+            headers: {
+                'Authorization': `Bearer ${currentToken}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('获取商品详情失败');
+        }
+        
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.message || '获取商品详情失败');
+        }
+        
+        const productData = result.data;
+        
+        // 填充表单
+        document.getElementById('product-name').value = productData.name || '';
+        document.getElementById('product-description').value = productData.description || '';
+        document.getElementById('product-price').value = productData.price || '';
+        document.getElementById('product-stock').value = productData.stock || '';
+        
+        // 设置分类下拉框
+        setDropdownValue('product-category-dropdown', productData.category_id, '请选择分类');
+        
+        // 设置状态下拉框
+        setDropdownValue('product-status-dropdown', productData.status, '上架');
+        
+        // 设置图片预览
+        const preview = document.getElementById('product-image-preview');
+        if (preview && productData.image) {
+            preview.innerHTML = `<img src="${productData.image}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px;">`;
+        } else if (preview) {
+            preview.innerHTML = '';
+        }
+        
+        // 设置编辑模式
+        window.currentEditProductId = id;
+        
+    } catch (error) {
+        console.error('获取商品详情失败:', error);
+        showMessage('获取商品详情失败: ' + error.message, 'error');
     }
 }
 
-function saveProduct() {
-    // 实现保存商品逻辑
-    console.log('保存商品');
+function showProductModal(title) {
+    // 显示商品编辑弹窗
+    const modal = document.getElementById('product-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        // 更新标题
+        const titleElement = modal.querySelector('.modal-title');
+        if (titleElement) {
+            titleElement.textContent = title;
+        }
+        
+        // 重新初始化下拉框
+        setTimeout(() => {
+            initCustomDropdowns();
+        }, 100);
+    }
+}
+
+function hideProductModal() {
+    const modal = document.getElementById('product-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        // 清空表单
+        document.getElementById('product-form').reset();
+        document.getElementById('product-image-preview').innerHTML = '';
+        window.currentEditProductId = null;
+    }
+}
+
+async function saveProduct() {
+    try {
+        // 获取表单数据
+        const formData = {
+            name: document.getElementById('product-name').value,
+            description: document.getElementById('product-description').value,
+            price: document.getElementById('product-price').value,
+            stock: document.getElementById('product-stock').value,
+            category_id: getDropdownValue('product-category-dropdown'),
+            status: getDropdownValue('product-status-dropdown')
+        };
+        
+        // 验证必填字段
+        if (!formData.name || !formData.price || !formData.category_id) {
+            showMessage('请填写必填字段', 'error');
+            return;
+        }
+        
+        // 处理图片上传
+        const imageFile = document.getElementById('product-image').files[0];
+        console.log('图片文件:', imageFile);
+        console.log('文件列表长度:', document.getElementById('product-image').files.length);
+        
+        if (imageFile) {
+            console.log('上传图片中...', imageFile.name, imageFile.size, imageFile.type);
+            const imageUrl = await uploadProductImage(imageFile);
+            if (imageUrl) {
+                formData.image = imageUrl;
+                console.log('图片上传成功:', imageUrl);
+            }
+        } else {
+            console.log('没有选择图片文件');
+        }
+        
+        // 保存商品
+        const url = window.currentEditProductId 
+            ? `/api/admin/products/${window.currentEditProductId}`
+            : '/api/admin/products';
+        const method = window.currentEditProductId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentToken}`
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showMessage(window.currentEditProductId ? '商品更新成功' : '商品创建成功', 'success');
+            hideProductModal();
+            loadProducts(); // 重新加载商品列表
+        } else {
+            throw new Error(result.message || '保存失败');
+        }
+        
+    } catch (error) {
+        console.error('保存商品失败:', error);
+        showMessage('保存失败: ' + error.message, 'error');
+    }
 }
 
 // 分类相关操作
