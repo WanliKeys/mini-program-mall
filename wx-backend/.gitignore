@@ -1,0 +1,29 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env & secrets
+.env
+.env.*
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Builds & caches
+dist/
+build/
+coverage/
+.cache/
+
+# Runtime data
+uploads/
+logs/
+
+# Certificates (ignore private keys and pkcs12)
+certs/*.pem
+certs/*.key
+certs/*.p12
