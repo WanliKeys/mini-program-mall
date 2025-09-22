@@ -732,6 +732,7 @@ function setDropdownValue(dropdownId, value, defaultText) {
     const menu = dropdown.querySelector('.dropdown-menu');
     const trigger = dropdown.querySelector('.dropdown-trigger');
     const text = dropdown.querySelector('.dropdown-text');
+    const hiddenInput = dropdown.querySelector('input[type="hidden"]');
     
     if (!menu || !trigger || !text) return;
     
@@ -745,8 +746,18 @@ function setDropdownValue(dropdownId, value, defaultText) {
     if (targetItem) {
         targetItem.classList.add('active');
         text.textContent = targetItem.querySelector('span').textContent;
+        // 设置隐藏input的值
+        if (hiddenInput) {
+            hiddenInput.value = value;
+            console.log(`设置下拉框 ${dropdownId} 的隐藏input值为: ${value}`);
+        }
     } else {
         text.textContent = defaultText;
+        // 设置隐藏input的值为空
+        if (hiddenInput) {
+            hiddenInput.value = '';
+            console.log(`设置下拉框 ${dropdownId} 的隐藏input值为空`);
+        }
     }
 }
 
@@ -964,11 +975,11 @@ async function loadCategoriesForModal() {
             if (productCategoryDropdown) {
                 const menu = productCategoryDropdown.querySelector('.dropdown-menu');
                 const newHTML = `
-                    <div class="dropdown-item active" data-value="">
+                    <div class="dropdown-item active" data-value="${data.data[0] ? data.data[0].id : ''}">
                         <i class="bi bi-check"></i>
-                        <span>请选择分类</span>
+                        <span>${data.data[0] ? data.data[0].name : '请选择分类'}</span>
                     </div>
-                    ${data.data.map(category => `
+                    ${data.data.slice(1).map(category => `
                         <div class="dropdown-item" data-value="${category.id}">
                             <i class="bi bi-check"></i>
                             <span>${category.name}</span>
@@ -977,6 +988,15 @@ async function loadCategoriesForModal() {
                 `;
                 console.log('更新分类下拉框HTML:', newHTML);
                 menu.innerHTML = newHTML;
+                
+                // 设置默认值到隐藏input
+                if (data.data[0]) {
+                    const hiddenInput = productCategoryDropdown.querySelector('input[type="hidden"]');
+                    if (hiddenInput) {
+                        hiddenInput.value = data.data[0].id;
+                        console.log(`设置分类下拉框默认值为: ${data.data[0].id} (${data.data[0].name})`);
+                    }
+                }
                 
                 // 重新绑定事件
                 const items = menu.querySelectorAll('.dropdown-item');
