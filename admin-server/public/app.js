@@ -169,13 +169,49 @@ async function handleLogin(e) {
 
 // 显示消息提示
 function showMessage(message, type = 'info') {
-    // 创建消息元素
+    // 创建消息容器
     const messageDiv = document.createElement('div');
-    messageDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
-    messageDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    messageDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 99999;
+        min-width: 300px;
+        max-width: 500px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        animation: slideInRight 0.3s ease-out;
+    `;
+    
+    // 根据类型设置样式
+    if (type === 'success') {
+        messageDiv.style.background = '#d4edda';
+        messageDiv.style.color = '#155724';
+        messageDiv.style.border = '1px solid #c3e6cb';
+    } else if (type === 'error') {
+        messageDiv.style.background = '#f8d7da';
+        messageDiv.style.color = '#721c24';
+        messageDiv.style.border = '1px solid #f5c6cb';
+    } else {
+        messageDiv.style.background = '#d1ecf1';
+        messageDiv.style.color = '#0c5460';
+        messageDiv.style.border = '1px solid #bee5eb';
+    }
+    
+    // 添加图标
+    const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
     messageDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16px; font-weight: bold;">${icon}</span>
+            <span>${message}</span>
+        </div>
+        <button onclick="this.parentElement.remove()" style="background: none; border: none; color: inherit; cursor: pointer; font-size: 18px; padding: 0; margin-left: 8px;">×</button>
     `;
     
     // 添加到页面
@@ -184,7 +220,12 @@ function showMessage(message, type = 'info') {
     // 自动移除
     setTimeout(() => {
         if (messageDiv.parentNode) {
-            messageDiv.parentNode.removeChild(messageDiv);
+            messageDiv.style.animation = 'slideOutRight 0.3s ease-in';
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 300);
         }
     }, 3000);
 }
@@ -1281,15 +1322,37 @@ async function editProduct(id) {
     await loadProductForEdit(id);
 }
 
-function deleteProduct(id) {
-    showConfirmModal('确定要删除这个商品吗？', (confirmed) => {
+async function deleteProduct(id) {
+    showConfirmModal('确定要删除这个商品吗？', async (confirmed) => {
         if (confirmed) {
-        console.log('删除商品:', id);
-            // 这里应该调用删除API
-            showMessage('商品删除成功', 'success');
-            loadProducts(); // 重新加载商品列表
+            try {
+                console.log('删除商品:', id);
+                
+                const response = await fetch(`/api/admin/products/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                console.log('删除响应:', response.status, result);
+                
+                if (response.ok && result.success) {
+                    console.log('删除成功，显示成功消息');
+                    showMessage('商品删除成功', 'success');
+                    loadProducts(); // 重新加载商品列表
+                } else {
+                    console.log('删除失败，显示错误消息:', result.message);
+                    showMessage(result.message || '删除失败', 'error');
+                }
+            } catch (error) {
+                console.error('删除商品失败:', error);
+                showMessage('删除失败: ' + error.message, 'error');
+            }
         }
-    });
+    }, '删除');
 }
 
 async function loadProductForEdit(id) {
@@ -1506,11 +1569,15 @@ function logout() {
 
 // 通用确认弹窗
 let _confirmResolver = null;
-function showConfirmModal(message, cb) {
+function showConfirmModal(message, cb, confirmText = '确认') {
     const overlay = document.getElementById('confirm-modal');
     const msg = document.getElementById('confirm-modal-message');
+    const confirmBtn = document.getElementById('confirm-modal-confirm-btn');
     if (!overlay || !msg) return cb(true);
     msg.textContent = message || '确认操作？';
+    if (confirmBtn) {
+        confirmBtn.textContent = confirmText;
+    }
     overlay.style.display = 'flex';
     _confirmResolver = cb;
 }
