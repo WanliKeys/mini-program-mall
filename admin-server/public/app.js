@@ -609,6 +609,12 @@ function toggleDropdown(dropdown) {
 
 // 选择下拉框选项
 function selectDropdownItem(dropdown, item) {
+    console.log('=== selectDropdownItem 被调用 ===', {
+        dropdownId: dropdown.id,
+        itemText: item.textContent,
+        itemValue: item.getAttribute('data-value')
+    });
+    
     const menu = dropdown.querySelector('.dropdown-menu');
     const trigger = dropdown.querySelector('.dropdown-trigger');
     const text = dropdown.querySelector('.dropdown-text');
@@ -621,6 +627,12 @@ function selectDropdownItem(dropdown, item) {
     
     // 更新触发器文本
     text.textContent = label;
+    
+    console.log('=== 分类选择完成 ===', {
+        selectedValue: value,
+        selectedLabel: label,
+        hasActiveClass: item.classList.contains('active')
+    });
     
     // 关闭菜单
     menu.classList.remove('show');
@@ -1384,7 +1396,6 @@ function hideProductModal() {
 
 async function saveProduct() {
     console.log('=== saveProduct 函数被调用 ===');
-    console.log('=== 开始获取表单数据 ===');
     try {
         // 获取表单数据
         const formData = {
@@ -1392,39 +1403,24 @@ async function saveProduct() {
             description: document.getElementById('product-description').value,
             price: document.getElementById('product-price').value,
             stock: document.getElementById('product-stock').value,
-            category_id: getDropdownValue('product-category-dropdown'),
+            categoryId: getDropdownValue('product-category-dropdown'), // 修改为驼峰命名
             status: getDropdownValue('product-status-dropdown')
         };
         
-        console.log('表单数据:', formData);
-        console.log('分类下拉框值:', getDropdownValue('product-category-dropdown'));
-        console.log('状态下拉框值:', getDropdownValue('product-status-dropdown'));
-        
         // 验证必填字段
-        if (!formData.name || !formData.price || !formData.category_id) {
-            console.error('验证失败:', {
-                name: formData.name,
-                price: formData.price,
-                category_id: formData.category_id
-            });
+        if (!formData.name || !formData.price || !formData.categoryId) {
             showMessage('请填写必填字段', 'error');
             return;
         }
         
         // 所有校验通过后，处理图片上传
         const imageFile = document.getElementById('product-image').files[0];
-        console.log('图片文件:', imageFile);
-        console.log('文件列表长度:', document.getElementById('product-image').files.length);
 
         if (imageFile) {
-            console.log('上传图片中...', imageFile.name, imageFile.size, imageFile.type);
             const imageUrl = await uploadProductImage(imageFile);
             if (imageUrl) {
                 formData.image = imageUrl;
-                console.log('图片上传成功:', imageUrl);
             }
-        } else {
-            console.log('没有选择图片文件');
         }
         
         // 保存商品
