@@ -323,14 +323,6 @@
                             <h2>商品管理</h2>
                             <p>管理商城中的所有商品</p>
                         </div>
-                        <div class="page-actions">
-                            <button class="btn btn-outline" onclick="exportProducts()">
-                                <i class="bi bi-download"></i> 导出
-                            </button>
-                            <button class="btn btn-primary" onclick="showProductModal('添加商品')">
-                                <i class="bi bi-plus"></i> 添加商品
-                            </button>
-                        </div>
                     </div>
 
                     <div class="filter-section">
@@ -377,6 +369,11 @@
                             <div class="filter-group">
                                 <button class="btn btn-primary" onclick="loadProducts()">
                                     <i class="bi bi-search"></i> 搜索
+                                </button>
+                            </div>
+                            <div class="filter-group">
+                                <button class="btn btn-primary" onclick="showProductModal('添加商品')">
+                                    <i class="bi bi-plus"></i> 添加商品
                                 </button>
                             </div>
                         </div>

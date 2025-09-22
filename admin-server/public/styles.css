@@ -188,9 +188,40 @@ body {
     color: var(--primary-color);
 }
 
+.btn-success {
+    background: var(--success-color);
+    color: #fff;
+}
+
+.btn-success:hover {
+    background: #73d13d;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+}
+
 .btn-sm {
     padding: 8px 16px;
     font-size: var(--font-size-xs);
+}
+
+/* 搜索区域统一样式 - 高度协调 */
+.filter-section .form-control {
+    padding: 10px 12px;
+    height: 40px;
+    font-size: var(--font-size-sm);
+}
+
+.filter-section .dropdown-trigger {
+    padding: 10px 12px;
+    height: 40px;
+    font-size: var(--font-size-sm);
+}
+
+.filter-section .btn {
+    padding: 10px 16px;
+    height: 40px;
+    font-size: var(--font-size-sm);
+    min-width: auto;
 }
 
 .btn-login {
@@ -729,7 +760,18 @@ body {
     min-width: 200px;
 }
 
+/* 搜索框组 - 更宽 */
+.filter-group:first-child {
+    min-width: 300px;
+    flex: 1;
+}
+
+/* 按钮组 - 自适应宽度 */
 .filter-group:last-child {
+    min-width: auto;
+}
+
+.filter-group:nth-last-child(2) {
     min-width: auto;
 }
 
