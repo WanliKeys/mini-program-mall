@@ -42,26 +42,38 @@ router.use(adminAuth);
  */
 router.get('/', asyncHandler(async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, search } = req.query;
     
-    let whereClause = '';
+    const conditions = [];
     const params = [];
     
-    if (status !== undefined) {
-      whereClause = 'WHERE status = ?';
-      params.push(status);
+    if (status !== undefined && status !== '') {
+      const parsedStatus = Number.parseInt(status, 10);
+      if (!Number.isNaN(parsedStatus)) {
+        conditions.push('c.status = ?');
+        params.push(parsedStatus);
+      }
+    }
+    if (search) {
+      conditions.push('(c.name LIKE ?)');
+      params.push(`%${search}%`);
     }
     
-    const categories = await query(`
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    
+    const sql = `
       SELECT 
         c.*,
-        COUNT(p.id) as product_count
+        (SELECT COUNT(p.id) FROM products p WHERE p.category_id = c.id) AS product_count
       FROM categories c
-      LEFT JOIN products p ON c.id = p.category_id
       ${whereClause}
-      GROUP BY c.id
       ORDER BY c.sort_order ASC, c.created_at DESC
-    `, params);
+    `;
+    if (process.env.DEBUG_SQL) {
+      console.log('[ADMIN][CATEGORIES] SQL:', sql);
+      console.log('[ADMIN][CATEGORIES] PARAMS:', params);
+    }
+    const categories = await query(sql, params);
     
     success(res, categories, '获取分类列表成功');
     

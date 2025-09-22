@@ -1036,7 +1036,6 @@ async function loadCategories() {
     const params = new URLSearchParams();
     if (searchTerm) params.append('search', searchTerm);
     if (statusFilter) params.append('status', statusFilter);
-    
     const queryString = params.toString();
     const url = queryString ? `${API_BASE}/admin/categories?${queryString}` : `${API_BASE}/admin/categories`;
     
