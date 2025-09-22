@@ -267,7 +267,8 @@ router.put('/:id', upload.single('image'), asyncHandler(async (req, res) => {
       originalPrice,
       stock,
       status,
-      tags
+      tags,
+      image
     } = req.body;
     
     // 检查商品是否存在
@@ -334,8 +335,22 @@ router.put('/:id', upload.single('image'), asyncHandler(async (req, res) => {
     
     // 处理图片更新
     if (req.file) {
+      // 通过文件上传更新图片
+      const imageUrl = `/uploads/images/products/${req.file.filename}`;
       updateFields.push('image = ?');
-      updateValues.push(`/uploads/images/products/${req.file.filename}`);
+      updateValues.push(imageUrl);
+      
+      // 同时更新images字段，将新图片添加到images数组中
+      updateFields.push('images = ?');
+      updateValues.push(JSON.stringify([imageUrl]));
+    } else if (image) {
+      // 通过JSON请求体更新图片
+      updateFields.push('image = ?');
+      updateValues.push(image);
+      
+      // 同时更新images字段
+      updateFields.push('images = ?');
+      updateValues.push(JSON.stringify([image]));
     }
     
     if (updateFields.length === 0) {

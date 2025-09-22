@@ -1243,10 +1243,28 @@ async function loadProductForEdit(id) {
         
         // 设置图片预览
         const preview = document.getElementById('product-image-preview');
-        if (preview && productData.image) {
-            preview.innerHTML = `<img src="${productData.image}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px;">`;
-        } else if (preview) {
-            preview.innerHTML = '';
+        console.log('商品数据:', productData);
+        console.log('图片字段 - image:', productData.image);
+        console.log('图片字段 - images:', productData.images);
+        
+        if (preview) {
+            // 优先使用images数组中的第一个图片，如果没有则使用image字段
+            const imageUrl = (productData.images && productData.images.length > 0) 
+                ? productData.images[0] 
+                : productData.image;
+            
+            console.log('选择的图片URL:', imageUrl);
+            
+            if (imageUrl) {
+                console.log('显示商品图片:', imageUrl);
+                const imgElement = `<img src="${imageUrl}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px;" onload="console.log('图片加载成功:', this.src)" onerror="console.error('图片加载失败:', this.src)">`;
+                preview.innerHTML = imgElement;
+            } else {
+                console.log('没有找到商品图片');
+                preview.innerHTML = '';
+            }
+        } else {
+            console.error('找不到图片预览容器');
         }
         
         // 设置编辑模式

@@ -36,19 +36,9 @@ app.use(express.static(path.join(__dirname, 'public'), {
     }
 }));
 
-// 配置文件上传
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, 'uploads'));
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
+// 配置文件上传 - 使用内存存储
 const upload = multer({
-  storage: storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB
   },
@@ -119,32 +109,70 @@ app.put('/api/admin/products/:id', upload.single('image'), async (req, res) => {
 });
 app.delete('/api/admin/products/:id', (req, res) => proxyRequest(req, res, `/admin/products/${req.params.id}`, 'DELETE'));
 
-// 商品图片上传 - 直接代理multipart请求到后端
-app.post('/api/admin/products/upload-image', (req, res) => {
-  // 直接转发multipart请求到后端
-  const url = `${API_BASE_URL}/admin/products/upload-image`;
-  
-  // 使用axios直接转发请求
-  axios({
-    method: 'POST',
-    url: url,
-    headers: {
-      'Authorization': req.headers.authorization || '',
-      'Content-Type': req.headers['content-type'] || 'multipart/form-data'
-    },
-    data: req, // 直接传递原始请求流
-    maxContentLength: Infinity,
-    maxBodyLength: Infinity
-  }).then(response => {
+// 商品图片上传 - 使用multer处理并重新构建FormData
+app.post('/api/admin/products/upload-image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: '请选择要上传的图片',
+        error: 'No file uploaded'
+      });
+    }
+    
+    console.log('代理服务器接收到的文件:', {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      filename: req.file.filename,
+      bufferLength: req.file.buffer ? req.file.buffer.length : 'undefined',
+      bufferType: typeof req.file.buffer
+    });
+    
+    // 重新构建FormData发送到后端
+    const FormData = require('form-data');
+    const formData = new FormData();
+    
+    // 确保buffer是有效的
+    if (!req.file.buffer || req.file.buffer.length === 0) {
+      throw new Error('文件buffer为空或无效');
+    }
+    
+    // 直接使用buffer作为stream
+    formData.append('image', req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype
+    });
+    
+    console.log('发送到后端的FormData:', {
+      fieldName: 'image',
+      fileName: req.file.originalname,
+      contentType: req.file.mimetype,
+      bufferSize: req.file.buffer.length,
+      bufferPreview: req.file.buffer.slice(0, 20).toString('hex') // 显示前20字节的十六进制
+    });
+    
+    const response = await axios({
+      method: 'POST',
+      url: `${API_BASE_URL}/admin/products/upload-image`,
+      headers: {
+        'Authorization': req.headers.authorization || '',
+        ...formData.getHeaders()
+      },
+      data: formData,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity
+    });
+    
     res.status(response.status).json(response.data);
-  }).catch(error => {
+  } catch (error) {
     console.error('图片上传代理错误:', error.response?.data || error.message);
     res.status(error.response?.status || 500).json({
       success: false,
       message: '图片上传失败',
       error: error.message
     });
-  });
+  }
 });
 
 // 分类管理（代理）
