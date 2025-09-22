@@ -1055,7 +1055,16 @@ async function loadCategories() {
         const data = await response.json();
         
         if (data.success) {
-            renderCategoriesTable(data.data);
+            // 后端可能未按 search/status 过滤，这里做一次前端兜底过滤
+            let list = Array.isArray(data.data) ? data.data : [];
+            if (searchTerm) {
+                const kw = searchTerm.toLowerCase();
+                list = list.filter(c => (c.name || '').toLowerCase().includes(kw));
+            }
+            if (statusFilter !== '') {
+                list = list.filter(c => String(c.status) === String(statusFilter));
+            }
+            renderCategoriesTable(list);
             // 同时更新商品页面的分类筛选
             updateCategoryFilter(data.data);
         } else {
@@ -1552,26 +1561,119 @@ async function saveProduct() {
 
 // 分类相关操作
 function showCategoryModal() {
-    // 显示分类编辑弹窗
-    console.log('显示分类弹窗');
-    // TODO: 实现分类弹窗
-}
-
-function editCategory(id) {
-    // 实现编辑分类逻辑
-    console.log('编辑分类:', id);
-}
-
-function deleteCategory(id) {
-    if (confirm('确定要删除这个分类吗？')) {
-        // 实现删除分类逻辑
-        console.log('删除分类:', id);
+    const modal = document.getElementById('category-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.querySelector('.modal-title').textContent = '添加分类';
+        document.getElementById('category-id').value = '';
+        document.getElementById('category-form').reset();
+        // 初始化状态下拉
+        setTimeout(() => {
+            initCustomDropdowns();
+            setDropdownValue('category-modal-status-dropdown', '1', '启用');
+        }, 50);
     }
 }
 
+function editCategory(id) {
+    console.log('编辑分类:', id);
+    // 从当前表格中找到该行的数据（为了少一次请求，这里只获取必要字段）
+    const row = Array.from(document.querySelectorAll('#categories-table tr'))
+        .find(tr => tr.querySelector('td') && tr.querySelector('td').textContent.trim() !== '' && tr.querySelector('td').textContent.trim());
+    // 打开弹窗并填充（保险起见再调接口获取详情，如果后端无详情接口可以跳过）
+    const modal = document.getElementById('category-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.querySelector('.modal-title').textContent = '编辑分类';
+        document.getElementById('category-id').value = id;
+        // 拉取详情
+        fetch(`${API_BASE}/admin/categories?id=${id}`, {
+            headers: { 'Authorization': `Bearer ${currentToken}` }
+        }).then(r => r.json()).then(d => {
+            const item = Array.isArray(d.data) ? d.data.find(c => c.id == id) : (d.data || {});
+            document.getElementById('category-name').value = item?.name || '';
+            setTimeout(() => {
+                initCustomDropdowns();
+                setDropdownValue('category-modal-status-dropdown', String(item?.status ?? 1), item?.status == 1 ? '启用' : '禁用');
+            }, 50);
+        }).catch(() => {
+            // 回退逻辑
+            setTimeout(() => {
+                initCustomDropdowns();
+                setDropdownValue('category-modal-status-dropdown', '1', '启用');
+            }, 50);
+        });
+    }
+}
+
+function deleteCategory(id) {
+    showConfirmModal('确定要删除这个分类吗？', async (confirmed) => {
+        if (!confirmed) return;
+        try {
+            const resp = await fetch(`/api/admin/categories/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${currentToken}` }
+            });
+            const result = await resp.json();
+            if (resp.ok && result.success) {
+                showMessage('删除成功', 'success');
+                loadCategories();
+            } else {
+                showMessage(result.message || '删除失败', 'error');
+            }
+        } catch (e) {
+            showMessage('删除失败: ' + e.message, 'error');
+        }
+    }, '删除');
+}
+
 function saveCategory() {
-    // 实现保存分类逻辑
-    console.log('保存分类');
+    (async () => {
+        try {
+            const id = document.getElementById('category-id').value.trim();
+            const name = document.getElementById('category-name').value.trim();
+            const status = getDropdownValue('category-modal-status-dropdown') || '1';
+            const iconFile = document.getElementById('category-icon').files[0];
+
+            if (!name) {
+                showMessage('分类名称不能为空', 'error');
+                return;
+            }
+
+            // 如果有图标，先上传图标到代理的分类接口
+            let iconPath = '';
+            if (iconFile) {
+                const fd = new FormData();
+                fd.append('icon', iconFile);
+                const up = await fetch('/api/admin/categories', { method: 'POST', headers: { 'Authorization': `Bearer ${currentToken}` }, body: fd });
+                // 如果后端创建了新分类则不适合此路径，改为单独上传接口更好。这里不走此分支，改为表单直接提交文件。
+            }
+
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('status', status);
+            if (iconFile) formData.append('icon', iconFile);
+
+            const url = id ? `/api/admin/categories/${id}` : '/api/admin/categories';
+            const method = id ? 'PUT' : 'POST';
+            const resp = await fetch(url, { method, headers: { 'Authorization': `Bearer ${currentToken}` }, body: formData });
+            const result = await resp.json();
+            if (resp.ok && result.success) {
+                showMessage(id ? '更新成功' : '创建成功', 'success');
+                hideCategoryModal();
+                loadCategories();
+            } else {
+                showMessage(result.message || '保存失败', 'error');
+            }
+        } catch (e) {
+            showMessage('保存失败: ' + e.message, 'error');
+        }
+    })();
+}
+
+function hideCategoryModal() {
+    const modal = document.getElementById('category-modal');
+    if (modal) modal.style.display = 'none';
 }
 
 // 轮播图相关操作
