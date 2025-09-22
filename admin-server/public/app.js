@@ -221,9 +221,9 @@ function showMessage(message, type = 'info') {
     setTimeout(() => {
         if (messageDiv.parentNode) {
             messageDiv.style.animation = 'slideOutRight 0.3s ease-in';
-            setTimeout(() => {
-                if (messageDiv.parentNode) {
-                    messageDiv.parentNode.removeChild(messageDiv);
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            messageDiv.parentNode.removeChild(messageDiv);
                 }
             }, 300);
         }
@@ -350,6 +350,10 @@ function loadPageData(pageName) {
             break;
         case 'categories':
             loadCategories();
+            // 重新初始化自定义下拉框
+            setTimeout(() => {
+                initCustomDropdowns();
+            }, 100);
             break;
         case 'banners':
             loadBanners();
@@ -1022,10 +1026,22 @@ async function loadCategoriesForModal() {
 // 加载分类列表
 async function loadCategories() {
     const tbody = document.getElementById('categories-table');
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center"><div class="loading show"><div class="spinner-border" role="status"><span class="visually-hidden">加载中...</span></div></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="loading show"><div class="spinner-border" role="status"><span class="visually-hidden">加载中...</span></div></div></td></tr>';
+    
+    // 获取搜索和筛选参数
+    const searchTerm = document.getElementById('category-search')?.value || '';
+    const statusFilter = getDropdownValue('category-status-dropdown') || '';
+    
+    // 构建查询参数
+    const params = new URLSearchParams();
+    if (searchTerm) params.append('search', searchTerm);
+    if (statusFilter) params.append('status', statusFilter);
+    
+    const queryString = params.toString();
+    const url = queryString ? `${API_BASE}/admin/categories?${queryString}` : `${API_BASE}/admin/categories`;
     
     try {
-        const response = await fetch(`${API_BASE}/admin/categories`, {
+        const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${currentToken}`,
                 'Content-Type': 'application/json'
@@ -1056,31 +1072,28 @@ function renderCategoriesTable(categories) {
     const tbody = document.getElementById('categories-table');
     
     if (categories.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">暂无数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">暂无数据</td></tr>';
         return;
     }
     
     tbody.innerHTML = categories.map(category => `
         <tr>
-            <td>${category.id}</td>
             <td>${category.name}</td>
-            <td>
-                ${category.icon ? `<img src="${category.icon}" style="width: 30px; height: 30px; object-fit: cover;" onerror="this.style.display='none'">` : '-'}
-            </td>
-            <td>${category.sort_order}</td>
-            <td>${category.product_count || 0}</td>
-            <td>
+            <td class="text-center">${category.product_count || 0}</td>
+            <td class="text-center">
                 <span class="badge ${category.status == 1 ? 'bg-success' : 'bg-secondary'} status-badge">
                     ${category.status == 1 ? '启用' : '禁用'}
                 </span>
             </td>
-            <td>
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="editCategory(${category.id})">
-                    <i class="bi bi-pencil"></i>
+            <td class="text-center">
+                <div class="action-buttons" style="justify-content:center;">
+                    <button class="action-btn edit" onclick="editCategory(${category.id})">
+                        <i class="bi bi-pencil"></i><span>编辑</span>
                 </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(${category.id})">
-                    <i class="bi bi-trash"></i>
+                    <button class="action-btn delete" onclick="deleteCategory(${category.id})">
+                        <i class="bi bi-trash"></i><span>删除</span>
                 </button>
+                </div>
             </td>
         </tr>
     `).join('');
@@ -1346,7 +1359,7 @@ async function deleteProduct(id) {
     showConfirmModal('确定要删除这个商品吗？', async (confirmed) => {
         if (confirmed) {
             try {
-                console.log('删除商品:', id);
+        console.log('删除商品:', id);
                 
                 const response = await fetch(`/api/admin/products/${id}`, {
                     method: 'DELETE',
@@ -1538,6 +1551,12 @@ async function saveProduct() {
 }
 
 // 分类相关操作
+function showCategoryModal() {
+    // 显示分类编辑弹窗
+    console.log('显示分类弹窗');
+    // TODO: 实现分类弹窗
+}
+
 function editCategory(id) {
     // 实现编辑分类逻辑
     console.log('编辑分类:', id);

@@ -423,13 +423,45 @@
                             <h2>商品分类</h2>
                             <p>管理商品分类信息</p>
                         </div>
-                        <div class="page-actions">
-                            <button class="btn btn-outline" onclick="sortCategories()">
-                                <i class="bi bi-sort-alpha-down"></i> 排序
-                            </button>
-                            <button class="btn btn-primary" onclick="showCategoryModal()">
-                                <i class="bi bi-plus"></i> 添加分类
-                            </button>
+                    </div>
+
+                    <div class="filter-section">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <input type="text" class="form-control" id="category-search" placeholder="搜索分类名称...">
+                            </div>
+                            <div class="filter-group">
+                                <div class="custom-dropdown" id="category-status-dropdown">
+                                    <div class="dropdown-trigger">
+                                        <span class="dropdown-text">所有状态</span>
+                                        <i class="bi bi-chevron-down"></i>
+                                    </div>
+                                    <div class="dropdown-menu">
+                                        <div class="dropdown-item active" data-value="">
+                                            <i class="bi bi-check"></i>
+                                            <span>所有状态</span>
+                                        </div>
+                                        <div class="dropdown-item" data-value="1">
+                                            <i class="bi bi-check"></i>
+                                            <span>启用</span>
+                                        </div>
+                                        <div class="dropdown-item" data-value="0">
+                                            <i class="bi bi-check"></i>
+                                            <span>禁用</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="filter-group">
+                                <button class="btn btn-primary" onclick="loadCategories()">
+                                    <i class="bi bi-search"></i> 搜索
+                                </button>
+                            </div>
+                            <div class="filter-group">
+                                <button class="btn btn-primary" onclick="showCategoryModal()">
+                                    <i class="bi bi-plus"></i> 添加分类
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -438,12 +470,10 @@
                             <table class="data-table">
                                 <thead>
                                     <tr>
-                                        <th width="60">ID</th>
                                         <th>分类信息</th>
-                                        <th width="100">排序</th>
-                                        <th width="100">商品数量</th>
-                                        <th width="100">状态</th>
-                                        <th width="120">操作</th>
+                                        <th width="120" class="text-center">商品数量</th>
+                                        <th width="120" class="text-center">状态</th>
+                                        <th width="160" class="text-center">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="categories-table">

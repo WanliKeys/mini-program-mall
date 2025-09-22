@@ -813,6 +813,12 @@ body {
     vertical-align: middle;
 }
 
+/* 允许在表格中使用 .text-center 强制居中 */
+.data-table th.text-center,
+.data-table td.text-center {
+    text-align: center;
+}
+
 .data-table tbody tr:hover {
     background: var(--background-light);
 }
