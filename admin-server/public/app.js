@@ -1090,7 +1090,7 @@ function renderCategoriesTable(categories) {
                     <button class="action-btn edit" onclick="editCategory(${category.id})">
                         <i class="bi bi-pencil"></i><span>编辑</span>
                 </button>
-                    <button class="action-btn delete" onclick="deleteCategory(${category.id})">
+                    <button class="action-btn danger" onclick="deleteCategory(${category.id})">
                         <i class="bi bi-trash"></i><span>删除</span>
                 </button>
                 </div>
