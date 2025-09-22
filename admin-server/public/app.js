@@ -653,10 +653,22 @@ function closeAllDropdowns() {
 // 获取下拉框选中的值
 function getDropdownValue(dropdownId) {
     const dropdown = document.getElementById(dropdownId);
-    if (!dropdown) return '';
+    if (!dropdown) {
+        console.error('找不到下拉框:', dropdownId);
+        return '';
+    }
     
     const activeItem = dropdown.querySelector('.dropdown-item.active');
-    return activeItem ? activeItem.getAttribute('data-value') : '';
+    const value = activeItem ? activeItem.getAttribute('data-value') : '';
+    
+    console.log('获取下拉框值:', {
+        dropdownId: dropdownId,
+        hasActiveItem: !!activeItem,
+        value: value,
+        activeItemText: activeItem ? activeItem.textContent : 'none'
+    });
+    
+    return value;
 }
 
 // 设置下拉框的值
@@ -873,6 +885,65 @@ function renderProductsTable(products) {
             </td>
         </tr>
     `).join('');
+}
+
+// 为商品编辑弹窗加载分类数据
+async function loadCategoriesForModal() {
+    console.log('=== loadCategoriesForModal 函数被调用 ===');
+    try {
+        const response = await fetch(`${API_BASE}/admin/categories`, {
+            headers: {
+                'Authorization': `Bearer ${currentToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('获取分类列表失败');
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            console.log('分类数据加载成功:', data.data);
+            // 更新商品编辑弹窗的分类下拉框
+            const productCategoryDropdown = document.getElementById('product-category-dropdown');
+            if (productCategoryDropdown) {
+                const menu = productCategoryDropdown.querySelector('.dropdown-menu');
+                const newHTML = `
+                    <div class="dropdown-item active" data-value="">
+                        <i class="bi bi-check"></i>
+                        <span>请选择分类</span>
+                    </div>
+                    ${data.data.map(category => `
+                        <div class="dropdown-item" data-value="${category.id}">
+                            <i class="bi bi-check"></i>
+                            <span>${category.name}</span>
+                        </div>
+                    `).join('')}
+                `;
+                console.log('更新分类下拉框HTML:', newHTML);
+                menu.innerHTML = newHTML;
+                
+                // 重新绑定事件
+                const items = menu.querySelectorAll('.dropdown-item');
+                console.log('找到分类选项数量:', items.length);
+                items.forEach(item => {
+                    item.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        console.log('点击编辑弹窗分类选项:', item.textContent);
+                        selectDropdownItem(productCategoryDropdown, item);
+                    });
+                });
+            } else {
+                console.error('找不到商品分类下拉框');
+            }
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (error) {
+        console.error('加载分类数据失败:', error);
+    }
 }
 
 // 加载分类列表
@@ -1235,8 +1306,11 @@ async function loadProductForEdit(id) {
         document.getElementById('product-price').value = productData.price || '';
         document.getElementById('product-stock').value = productData.stock || '';
         
-        // 设置分类下拉框
-        setDropdownValue('product-category-dropdown', productData.category_id, '请选择分类');
+        // 设置分类下拉框 - 延迟设置，确保分类数据已加载
+        setTimeout(() => {
+            console.log('设置分类下拉框值:', productData.category_id);
+            setDropdownValue('product-category-dropdown', productData.category_id, '请选择分类');
+        }, 200);
         
         // 设置状态下拉框
         setDropdownValue('product-status-dropdown', productData.status, '上架');
@@ -1288,8 +1362,11 @@ function showProductModal(title) {
         }
         
         // 重新初始化下拉框
-        setTimeout(() => {
+        setTimeout(async () => {
+            console.log('=== showProductModal 开始初始化下拉框 ===');
             initCustomDropdowns();
+            // 加载分类数据到编辑弹窗的下拉框
+            await loadCategoriesForModal();
         }, 100);
     }
 }
@@ -1306,6 +1383,8 @@ function hideProductModal() {
 }
 
 async function saveProduct() {
+    console.log('=== saveProduct 函数被调用 ===');
+    console.log('=== 开始获取表单数据 ===');
     try {
         // 获取表单数据
         const formData = {
@@ -1317,17 +1396,26 @@ async function saveProduct() {
             status: getDropdownValue('product-status-dropdown')
         };
         
+        console.log('表单数据:', formData);
+        console.log('分类下拉框值:', getDropdownValue('product-category-dropdown'));
+        console.log('状态下拉框值:', getDropdownValue('product-status-dropdown'));
+        
         // 验证必填字段
         if (!formData.name || !formData.price || !formData.category_id) {
+            console.error('验证失败:', {
+                name: formData.name,
+                price: formData.price,
+                category_id: formData.category_id
+            });
             showMessage('请填写必填字段', 'error');
             return;
         }
         
-        // 处理图片上传
+        // 所有校验通过后，处理图片上传
         const imageFile = document.getElementById('product-image').files[0];
         console.log('图片文件:', imageFile);
         console.log('文件列表长度:', document.getElementById('product-image').files.length);
-        
+
         if (imageFile) {
             console.log('上传图片中...', imageFile.name, imageFile.size, imageFile.type);
             const imageUrl = await uploadProductImage(imageFile);
