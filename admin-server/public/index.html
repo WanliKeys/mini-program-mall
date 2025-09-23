@@ -517,32 +517,33 @@
                             <h2>订单管理</h2>
                             <p>查看和处理用户订单</p>
                         </div>
-                        <div class="page-actions">
-                            <button class="btn btn-outline" onclick="exportOrders()">
-                                <i class="bi bi-download"></i> 导出订单
-                            </button>
-                            <button class="btn btn-primary" onclick="refreshOrders()">
-                                <i class="bi bi-arrow-clockwise"></i> 刷新
-                            </button>
-                        </div>
+                        <div class="page-actions"></div>
                     </div>
 
-                    <div class="stats-row">
-                        <div class="stat-item">
-                            <div class="stat-value" id="total-orders-count">-</div>
-                            <div class="stat-label">总订单</div>
+                    <div class="orders-stats-grid">
+                        <div class="action-card">
+                            <div class="action-content">
+                                <h4 id="total-orders-count">-</h4>
+                                <p>总订单</p>
+                            </div>
                         </div>
-                        <div class="stat-item">
-                            <div class="stat-value" id="pending-orders-count">-</div>
-                            <div class="stat-label">待处理</div>
+                        <div class="action-card">
+                            <div class="action-content">
+                                <h4 id="pending-orders-count">-</h4>
+                                <p>待处理</p>
+                            </div>
                         </div>
-                        <div class="stat-item">
-                            <div class="stat-value" id="completed-orders-count">-</div>
-                            <div class="stat-label">已完成</div>
+                        <div class="action-card">
+                            <div class="action-content">
+                                <h4 id="completed-orders-count">-</h4>
+                                <p>已完成</p>
+                            </div>
                         </div>
-                        <div class="stat-item">
-                            <div class="stat-value" id="total-amount">-</div>
-                            <div class="stat-label">总金额</div>
+                        <div class="action-card">
+                            <div class="action-content">
+                                <h4 id="total-amount">-</h4>
+                                <p>总金额</p>
+                            </div>
                         </div>
                     </div>
 
