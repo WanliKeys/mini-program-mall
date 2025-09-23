@@ -364,6 +364,8 @@ function loadPageData(pageName) {
             break;
         case 'orders':
             console.log('Switching to orders page, calling loadOrders()');
+            // 默认时间范围：当前自然月
+            setDefaultOrderDateRange();
             loadOrders();
             // 初始化订单筛选下拉框
             setTimeout(() => {
@@ -773,6 +775,37 @@ function setDropdownValue(dropdownId, value, defaultText) {
             console.log(`设置下拉框 ${dropdownId} 的隐藏input值为空`);
         }
     }
+}
+
+// 重置：商品筛选
+function resetProductFilters() {
+    const search = document.getElementById('product-search');
+    if (search) search.value = '';
+    setDropdownValue('category-dropdown', '', '所有分类');
+    setDropdownValue('status-dropdown', '', '所有状态');
+    loadProducts();
+}
+
+// 重置：分类筛选
+function resetCategoryFilters() {
+    const search = document.getElementById('category-search');
+    if (search) search.value = '';
+    setDropdownValue('category-status-dropdown', '', '所有状态');
+    loadCategories();
+}
+
+// 重置：订单筛选
+function resetOrderFilters() {
+    const search = document.getElementById('order-search');
+    if (search) search.value = '';
+    // 清空日期并回到当前自然月
+    const fromEl = document.getElementById('order-date-from');
+    const toEl = document.getElementById('order-date-to');
+    if (fromEl) fromEl.value = '';
+    if (toEl) toEl.value = '';
+    setDefaultOrderDateRange();
+    setDropdownValue('order-status-dropdown', '', '所有状态');
+    loadOrders();
 }
 
 // 上传商品图片
@@ -1467,6 +1500,30 @@ function renderPagination(pagination, type) {
     }
     
     container.innerHTML = html;
+}
+
+// 设置订单页默认日期为当前自然月
+function setDefaultOrderDateRange() {
+    try {
+        const fromEl = document.getElementById('order-date-from');
+        const toEl = document.getElementById('order-date-to');
+        if (!fromEl || !toEl) return;
+        // 仅当为空时设置，避免覆盖用户已选
+        if (!fromEl.value && !toEl.value) {
+            const now = new Date();
+            const first = new Date(now.getFullYear(), now.getMonth(), 1);
+            const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            const toDateStr = (d) => {
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${d.getFullYear()}-${m}-${day}`;
+            };
+            fromEl.value = toDateStr(first);
+            toEl.value = toDateStr(last);
+        }
+    } catch (e) {
+        console.warn('setDefaultOrderDateRange failed', e);
+    }
 }
 
 // 图片预览

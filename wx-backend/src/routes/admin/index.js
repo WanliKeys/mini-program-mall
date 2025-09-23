@@ -86,6 +86,7 @@ router.get('/orders', adminAuth, asyncHandler(async (req, res) => {
     params.push(to + ' 23:59:59');
   }
   const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+  const baseFrom = 'FROM orders o LEFT JOIN users u ON u.id = o.user_id';
 
   const limit = parseInt(pageSize, 10) || 10;
   const offset = (parseInt(page, 10) - 1) * limit;
@@ -98,8 +99,7 @@ router.get('/orders', adminAuth, asyncHandler(async (req, res) => {
             o.status,
             o.created_at AS createdAt,
             u.username AS userName
-     FROM orders o
-     LEFT JOIN users u ON u.id = o.user_id
+     ${baseFrom}
      ${whereSql}
      ORDER BY o.created_at DESC
      LIMIT ? OFFSET ?`,
@@ -107,10 +107,10 @@ router.get('/orders', adminAuth, asyncHandler(async (req, res) => {
   );
 
   // 统计
-  const [[totalOrders]] = [await query(`SELECT COUNT(*) AS c FROM orders o ${whereSql}`, params)];
-  const [[pending]] = [await query(`SELECT COUNT(*) AS c FROM orders o ${whereSql} ${whereSql? 'AND' : 'WHERE'} o.status = 'pending'`, params)];
-  const [[completed]] = [await query(`SELECT COUNT(*) AS c FROM orders o ${whereSql} ${whereSql? 'AND' : 'WHERE'} o.status = 'completed'`, params)];
-  const [[totalAmount]] = [await query(`SELECT IFNULL(SUM(o.total_amount),0) AS s FROM orders o ${whereSql}`, params)];
+  const [[totalOrders]] = [await query(`SELECT COUNT(*) AS c ${baseFrom} ${whereSql}`, params)];
+  const [[pending]] = [await query(`SELECT COUNT(*) AS c ${baseFrom} ${whereSql} ${whereSql? 'AND' : 'WHERE'} o.status = 'pending'`, params)];
+  const [[completed]] = [await query(`SELECT COUNT(*) AS c ${baseFrom} ${whereSql} ${whereSql? 'AND' : 'WHERE'} o.status = 'completed'`, params)];
+  const [[totalAmount]] = [await query(`SELECT IFNULL(SUM(o.total_amount),0) AS s ${baseFrom} ${whereSql}`, params)];
 
   return success(res, {
     orders,

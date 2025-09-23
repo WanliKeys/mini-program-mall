@@ -232,6 +232,51 @@ body {
     line-height: 1;
 }
 
+/* 更紧凑的按钮（用于筛选区） */
+.btn-compact {
+    padding: 8px 12px !important;
+    height: 36px !important;
+    font-size: 12px !important;
+}
+
+/* 产品筛选行：固定为单行六列（桌面） */
+@media (min-width: 1200px) {
+    #products-page .filter-row {
+        display: grid;
+        grid-template-columns: 1fr 220px 160px 110px 100px 130px; /* 搜索输入、分类、状态、搜索、重置、添加 */
+        gap: 12px;
+        align-items: center;
+    }
+    #products-page .filter-group,
+    #products-page .filter-group:first-child,
+    #products-page .filter-group:last-child {
+        min-width: 0; /* 允许压缩 */
+        flex: 0 0 auto;
+    }
+    #products-page .filter-group .btn {
+        width: 100%;
+    }
+}
+
+/* 订单筛选行：单行六列（桌面） */
+@media (min-width: 1200px) {
+    #orders-page .filter-row {
+        display: grid;
+        grid-template-columns: 1fr 160px 180px 180px 110px 100px; /* 搜索、状态、开始、结束、搜索按钮、重置按钮 */
+        gap: 12px;
+        align-items: center;
+    }
+    #orders-page .filter-group,
+    #orders-page .filter-group:first-child,
+    #orders-page .filter-group:last-child {
+        min-width: 0;
+        flex: 0 0 auto;
+    }
+    #orders-page .filter-group .btn {
+        width: 100%;
+    }
+}
+
 .btn-login {
     width: 100%;
     padding: 14px;
@@ -1129,8 +1174,9 @@ body {
     align-items: center;
     justify-content: center;
     gap: 4px;
-    min-width: 60px;
+    min-width: 72px; /* 提升最小宽度，避免文本被过度压缩 */
     line-height: 1;
+    white-space: nowrap; /* 禁止换行，图标与文字保持一行 */
 }
 
 .action-btn:hover {

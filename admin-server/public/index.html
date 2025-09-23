@@ -216,40 +216,7 @@
                         
                     </div>
 
-                    <!-- 快速操作 -->
-                    <div class="quick-actions">
-                        <h3>快速操作</h3>
-                        <div class="action-grid">
-                            <div class="action-card" onclick="showPage('products')">
-                                <div class="action-icon">
-                                    <i class="bi bi-plus-circle"></i>
-                                </div>
-                                <div class="action-content">
-                                    <h4>添加商品</h4>
-                                    <p>快速添加新商品到商城</p>
-                                </div>
-                            </div>
-                            <div class="action-card" onclick="showPage('orders')">
-                                <div class="action-icon">
-                                    <i class="bi bi-eye"></i>
-                                </div>
-                                <div class="action-content">
-                                    <h4>查看订单</h4>
-                                    <p>管理用户订单状态</p>
-                                </div>
-                            </div>
-                            <div class="action-card" onclick="showPage('categories')">
-                                <div class="action-icon">
-                                    <i class="bi bi-tags"></i>
-                                </div>
-                                <div class="action-content">
-                                    <h4>管理分类</h4>
-                                    <p>组织商品分类结构</p>
-                                </div>
-                            </div>
-                            
-                        </div>
-                    </div>
+                    
 
                     <!-- 最近订单 -->
                     <div class="recent-orders">
@@ -337,12 +304,17 @@
                                 </div>
                             </div>
                             <div class="filter-group">
-                                <button class="btn btn-primary" onclick="loadProducts()">
+                                <button class="btn btn-primary btn-compact" onclick="loadProducts()">
                                     <i class="bi bi-search"></i> 搜索
                                 </button>
                             </div>
                             <div class="filter-group">
-                                <button class="btn btn-primary" onclick="showProductModal('添加商品')">
+                                <button class="btn btn-outline btn-compact" onclick="resetProductFilters()">
+                                    <i class="bi bi-arrow-counterclockwise"></i> 重置
+                                </button>
+                            </div>
+                            <div class="filter-group">
+                                <button class="btn btn-primary btn-compact" onclick="showProductModal('添加商品')">
                                     <i class="bi bi-plus"></i> 添加商品
                                 </button>
                             </div>
@@ -425,6 +397,11 @@
                             <div class="filter-group">
                                 <button class="btn btn-primary" onclick="loadCategories()">
                                     <i class="bi bi-search"></i> 搜索
+                                </button>
+                            </div>
+                            <div class="filter-group">
+                                <button class="btn btn-outline" onclick="resetCategoryFilters()">
+                                    <i class="bi bi-arrow-counterclockwise"></i> 重置
                                 </button>
                             </div>
                             <div class="filter-group">
@@ -595,6 +572,11 @@
                             <div class="filter-group">
                                 <button class="btn btn-primary" onclick="loadOrders()">
                                     <i class="bi bi-search"></i> 搜索
+                                </button>
+                            </div>
+                            <div class="filter-group">
+                                <button class="btn btn-outline" onclick="resetOrderFilters()">
+                                    <i class="bi bi-arrow-counterclockwise"></i> 重置
                                 </button>
                             </div>
                         </div>
