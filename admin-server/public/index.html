@@ -553,14 +553,38 @@
                                 <input type="text" class="form-control" id="order-search" placeholder="搜索订单号、用户...">
                             </div>
                             <div class="filter-group">
-                                <select class="form-control" id="order-status-filter">
-                                    <option value="">所有状态</option>
-                                    <option value="pending">待付款</option>
-                                    <option value="paid">已付款</option>
-                                    <option value="shipped">已发货</option>
-                                    <option value="completed">已完成</option>
-                                    <option value="cancelled">已取消</option>
-                                </select>
+                                <div class="custom-dropdown" id="order-status-dropdown">
+                                    <div class="dropdown-trigger">
+                                        <span class="dropdown-text">所有状态</span>
+                                        <i class="bi bi-chevron-down"></i>
+                                    </div>
+                                    <div class="dropdown-menu">
+                                        <div class="dropdown-item active" data-value="">
+                                            <i class="bi bi-check"></i>
+                                            <span>所有状态</span>
+                                        </div>
+                                        <div class="dropdown-item" data-value="pending">
+                                            <i class="bi bi-check"></i>
+                                            <span>待付款</span>
+                                        </div>
+                                        <div class="dropdown-item" data-value="paid">
+                                            <i class="bi bi-check"></i>
+                                            <span>已付款</span>
+                                        </div>
+                                        <div class="dropdown-item" data-value="shipped">
+                                            <i class="bi bi-check"></i>
+                                            <span>已发货</span>
+                                        </div>
+                                        <div class="dropdown-item" data-value="completed">
+                                            <i class="bi bi-check"></i>
+                                            <span>已完成</span>
+                                        </div>
+                                        <div class="dropdown-item" data-value="cancelled">
+                                            <i class="bi bi-check"></i>
+                                            <span>已取消</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="filter-group">
                                 <input type="date" class="form-control" id="order-date-from" placeholder="开始日期">

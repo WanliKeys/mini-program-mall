@@ -365,6 +365,10 @@ function loadPageData(pageName) {
         case 'orders':
             console.log('Switching to orders page, calling loadOrders()');
             loadOrders();
+            // 初始化订单筛选下拉框
+            setTimeout(() => {
+                initCustomDropdowns();
+            }, 100);
             break;
     }
 }
@@ -697,6 +701,8 @@ function selectDropdownItem(dropdown, item) {
         loadProducts(); // 重新加载商品列表
     } else if (dropdownId === 'status-dropdown') {
         loadProducts(); // 重新加载商品列表
+    } else if (dropdownId === 'order-status-dropdown') {
+        loadOrders(); // 订单状态筛选
     }
 }
 
@@ -1350,7 +1356,19 @@ async function loadOrders(page = 1, pageSize = 10) {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/admin/orders?page=${page}&pageSize=${pageSize}`, {
+        // 读取筛选条件
+        const statusFilter = getDropdownValue('order-status-dropdown') || '';
+        const searchTerm = document.getElementById('order-search')?.value?.trim() || '';
+        const dateFrom = document.getElementById('order-date-from')?.value || '';
+        const dateTo = document.getElementById('order-date-to')?.value || '';
+
+        const params = new URLSearchParams({ page, pageSize });
+        if (statusFilter) params.append('status', statusFilter);
+        if (searchTerm) params.append('search', searchTerm);
+        if (dateFrom) params.append('from', dateFrom);
+        if (dateTo) params.append('to', dateTo);
+
+        const response = await fetch(`${API_BASE}/admin/orders?${params.toString()}`, {
             headers: {
                 'Authorization': `Bearer ${currentToken}`
             }
@@ -1378,10 +1396,20 @@ async function loadOrders(page = 1, pageSize = 10) {
         console.log('API response data:', data);
         
         if (data.success) {
-            renderOrdersTable(data.data || []);
+            const list = Array.isArray(data.data?.orders) ? data.data.orders : (data.data || []);
+            renderOrdersTable(list);
+            // 更新统计卡片（顶部 1x4）
+            if (data.data && data.data.stats) {
+                const s = data.data.stats;
+                const safeSet = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+                safeSet('total-orders-count', s.totalOrders ?? '-');
+                safeSet('pending-orders-count', s.pending ?? '-');
+                safeSet('completed-orders-count', s.completed ?? '-');
+                safeSet('total-amount', typeof s.totalAmount === 'number' ? `¥${Number(s.totalAmount).toFixed(2)}` : '-');
+            }
             // 更新分页信息
-            if (data.pagination) {
-                renderPagination(data.pagination, 'orders');
+            if (data.data && data.data.pagination) {
+                renderPagination(data.data.pagination, 'orders');
             }
         } else {
             throw new Error(data.message || '获取订单列表失败');
