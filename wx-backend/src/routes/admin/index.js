@@ -56,10 +56,77 @@ router.post('/change-password', adminAuth, asyncHandler(async (req, res) => {
   return success(res, null, '密码已更新');
 }));
 
-// 订单列表（简化）
+// 订单列表（支持筛选/统计/分页）
 router.get('/orders', adminAuth, asyncHandler(async (req, res) => {
-  const orders = await query('SELECT id, order_no as orderNo, total_amount as amount, status, created_at as createdAt FROM orders ORDER BY created_at DESC LIMIT 50');
-  return success(res, orders, '获取订单列表成功');
+  const {
+    status = '',
+    search = '',
+    from = '',
+    to = '',
+    page = 1,
+    pageSize = 10
+  } = req.query || {};
+
+  const where = [];
+  const params = [];
+  if (status) {
+    where.push('o.status = ?');
+    params.push(status);
+  }
+  if (search) {
+    where.push('(o.order_no LIKE ? OR u.username LIKE ?)');
+    params.push(`%${search}%`, `%${search}%`);
+  }
+  if (from) {
+    where.push('o.created_at >= ?');
+    params.push(from);
+  }
+  if (to) {
+    where.push('o.created_at <= ?');
+    params.push(to + ' 23:59:59');
+  }
+  const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+
+  const limit = parseInt(pageSize, 10) || 10;
+  const offset = (parseInt(page, 10) - 1) * limit;
+
+  // 列表，联表 users 获取用户名
+  const orders = await query(
+    `SELECT o.id,
+            o.order_no AS orderNo,
+            o.total_amount AS amount,
+            o.status,
+            o.created_at AS createdAt,
+            u.username AS userName
+     FROM orders o
+     LEFT JOIN users u ON u.id = o.user_id
+     ${whereSql}
+     ORDER BY o.created_at DESC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  );
+
+  // 统计
+  const [[totalOrders]] = [await query(`SELECT COUNT(*) AS c FROM orders o ${whereSql}`, params)];
+  const [[pending]] = [await query(`SELECT COUNT(*) AS c FROM orders o ${whereSql} ${whereSql? 'AND' : 'WHERE'} o.status = 'pending'`, params)];
+  const [[completed]] = [await query(`SELECT COUNT(*) AS c FROM orders o ${whereSql} ${whereSql? 'AND' : 'WHERE'} o.status = 'completed'`, params)];
+  const [[totalAmount]] = [await query(`SELECT IFNULL(SUM(o.total_amount),0) AS s FROM orders o ${whereSql}`, params)];
+
+  return success(res, {
+    orders,
+    pagination: {
+      page: parseInt(page, 10) || 1,
+      pageSize: limit,
+      total: totalOrders.c,
+      totalPages: Math.ceil(totalOrders.c / limit)
+    },
+    stats: {
+      totalOrders: totalOrders.c,
+      pending: pending.c,
+      completed: completed.c,
+      totalAmount: Number(totalAmount.s)
+    }
+  }, '获取订单列表成功');
 }));
 
 // 订单详情（管理员）
