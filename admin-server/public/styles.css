@@ -1446,7 +1446,7 @@ body {
     transform: rotate(180deg);
 }
 
-.dropdown-menu {
+.custom-dropdown .dropdown-menu {
     position: absolute;
     top: 100%;
     left: 0;
@@ -1463,11 +1463,11 @@ body {
     min-width: 100%;
 }
 
-.dropdown-menu.show {
+.custom-dropdown .dropdown-menu.show {
     display: block;
 }
 
-.dropdown-item {
+.custom-dropdown .dropdown-item {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -1481,12 +1481,12 @@ body {
     background: transparent;
 }
 
-.dropdown-item:hover {
+.custom-dropdown .dropdown-item:hover {
     background: #3498db;
     color: #fff;
 }
 
-.dropdown-item.active {
+.custom-dropdown .dropdown-item.active {
     background: #3498db;
     color: #fff;
     position: relative;
@@ -1494,7 +1494,7 @@ body {
 
 /* 移除左侧白色边框条 */
 
-.dropdown-item i {
+.custom-dropdown .dropdown-item i {
     font-size: 14px;
     width: 16px;
     text-align: center;
@@ -1503,12 +1503,12 @@ body {
     color: #fff;
 }
 
-.dropdown-item.active i {
+.custom-dropdown .dropdown-item.active i {
     opacity: 1;
     color: #fff;
 }
 
-.dropdown-item:hover i {
+.custom-dropdown .dropdown-item:hover i {
     opacity: 0.8;
     color: #fff;
 }
