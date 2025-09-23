@@ -104,9 +104,13 @@ function bindEvents() {
         previewImage(e.target, 'category-icon-preview');
     });
     
-    document.getElementById('banner-image').addEventListener('change', function(e) {
-        previewImage(e.target, 'banner-image-preview');
-    });
+    // 轮播图相关元素已移除，以下绑定需要容错
+    const bannerImageInput = document.getElementById('banner-image');
+    if (bannerImageInput) {
+        bannerImageInput.addEventListener('change', function(e) {
+            previewImage(e.target, 'banner-image-preview');
+        });
+    }
 }
 
 // 处理登录
@@ -356,7 +360,7 @@ function loadPageData(pageName) {
             }, 100);
             break;
         case 'banners':
-            loadBanners();
+            // 已移除轮播图管理页面
             break;
         case 'orders':
             console.log('Switching to orders page, calling loadOrders()');
@@ -381,7 +385,7 @@ async function loadDashboard() {
             document.getElementById('total-products').textContent = data.data.totalProducts;
             document.getElementById('total-orders').textContent = data.data.totalOrders;
             document.getElementById('total-categories').textContent = data.data.totalCategories;
-            document.getElementById('total-banners').textContent = data.data.totalBanners;
+            // 轮播图统计已移除
             
             // 渲染最近订单
             renderRecentOrders(data.data.recentOrders);
@@ -1172,7 +1176,13 @@ async function loadBanners() {
     tbody.innerHTML = '<tr><td colspan="7" class="text-center"><div class="loading show"><div class="spinner-border" role="status"><span class="visually-hidden">加载中...</span></div></div></td></tr>';
     
     try {
-        const response = await fetch(`${API_BASE}/admin/banners`, {
+        // 读取筛选条件
+        const status = getDropdownValue('banner-status-filter') || '';
+        const keyword = document.getElementById('banner-search')?.value || '';
+
+        const url = status !== '' ? `${API_BASE}/admin/banners?status=${encodeURIComponent(status)}` : `${API_BASE}/admin/banners`;
+
+        const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${currentToken}`,
                 'Content-Type': 'application/json'
@@ -1186,7 +1196,13 @@ async function loadBanners() {
         const data = await response.json();
         
         if (data.success) {
-            renderBannersTable(data.data);
+            // 前端关键字兜底过滤（标题、链接）
+            let list = Array.isArray(data.data) ? data.data : [];
+            if (keyword) {
+                const kw = keyword.toLowerCase();
+                list = list.filter(b => (b.title || '').toLowerCase().includes(kw) || (b.link || '').toLowerCase().includes(kw));
+            }
+            renderBannersTable(list);
         } else {
             throw new Error(data.message);
         }
@@ -1200,35 +1216,122 @@ async function loadBanners() {
 function renderBannersTable(banners) {
     const tbody = document.getElementById('banners-table');
     
-    if (banners.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">暂无数据</td></tr>';
+    if (!tbody) return;
+    if (!banners || banners.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">暂无数据</td></tr>';
         return;
     }
     
     tbody.innerHTML = banners.map(banner => `
-        <tr>
-            <td>${banner.id}</td>
-            <td>${banner.title}</td>
+        <tr data-id="${banner.id}" draggable="true" style="cursor: grab;">
             <td>
-                <img src="${banner.image}" style="width: 60px; height: 30px; object-fit: cover;" onerror="this.style.display='none'">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <img src="${banner.image}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #f0f0f0;" onerror="this.style.display='none'">
+                    <div style="min-width:0;">
+                        <div style="font-weight:600; color:#262626; margin-bottom:4px; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:420px;">${banner.title || '未命名轮播图'}</div>
+                        ${banner.link ? `<div style=\"color:#8c8c8c; font-size:12px; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:420px;\">${banner.link}</div>` : '<div style="color:#bfbfbf; font-size:12px;">无跳转链接</div>'}
+                    </div>
+                </div>
             </td>
-            <td>${banner.link || '-'}</td>
-            <td>${banner.sort_order}</td>
-            <td>
-                <span class="badge ${banner.status == 1 ? 'bg-success' : 'bg-secondary'} status-badge">
-                    ${banner.status == 1 ? '启用' : '禁用'}
-                </span>
+            <td class="text-center">${banner.sort_order}</td>
+            <td class="text-center">
+                <span class="badge ${banner.status == 1 ? 'bg-success' : 'bg-secondary'} status-badge">${banner.status == 1 ? '启用' : '禁用'}</span>
             </td>
-            <td>
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="editBanner(${banner.id})">
-                    <i class="bi bi-pencil"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteBanner(${banner.id})">
-                    <i class="bi bi-trash"></i>
-                </button>
+            <td class="text-center">
+                <div class="action-buttons" style="justify-content:center;">
+                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="previewBanner(${banner.id})" title="预览">
+                        <i class="bi bi-eye"></i>
+                        <span>预览</span>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editBanner(${banner.id})" title="编辑">
+                        <i class="bi bi-pencil"></i>
+                        <span>编辑</span>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteBanner(${banner.id})" title="删除">
+                        <i class="bi bi-trash"></i>
+                        <span>删除</span>
+                    </button>
+                </div>
             </td>
         </tr>
     `).join('');
+
+    enableBannerRowDrag();
+}
+
+function previewBanner(id) {
+    try {
+        const row = document.querySelector(`#banners-table tr[data-id="${id}"]`);
+        if (!row) return;
+        const img = row.querySelector('img');
+        const url = img && img.getAttribute('src');
+        if (url) {
+            window.open(url, '_blank');
+        } else {
+            showMessage('没有可预览的图片', 'error');
+        }
+    } catch (e) {
+        showMessage('预览失败: ' + e.message, 'error');
+    }
+}
+
+function enableBannerRowDrag() {
+    const tbody = document.getElementById('banners-table');
+    if (!tbody) return;
+
+    let dragEl = null;
+
+    tbody.addEventListener('dragstart', (e) => {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        dragEl = tr;
+        tr.style.opacity = '0.5';
+        e.dataTransfer.effectAllowed = 'move';
+    });
+
+    tbody.addEventListener('dragend', (e) => {
+        const tr = e.target.closest('tr');
+        if (tr) tr.style.opacity = '';
+        dragEl = null;
+    });
+
+    tbody.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const target = e.target.closest('tr');
+        if (!dragEl || !target || dragEl === target) return;
+        const rect = target.getBoundingClientRect();
+        const next = (e.clientY - rect.top) / (rect.height || 1) > 0.5;
+        tbody.insertBefore(dragEl, next ? target.nextSibling : target);
+    });
+
+    tbody.addEventListener('drop', async () => {
+        try {
+            // 计算新的排序：按当前行顺序 1..n
+            const rows = Array.from(tbody.querySelectorAll('tr[data-id]'));
+            const payload = rows.map((row, idx) => ({ id: Number(row.dataset.id), sortOrder: idx + 1 }));
+            await persistBannerSort(payload);
+            showMessage('排序已更新', 'success');
+            // 重新加载，确保 sort_order 显示为最新
+            loadBanners();
+        } catch (e) {
+            showMessage('保存排序失败: ' + e.message, 'error');
+        }
+    });
+}
+
+async function persistBannerSort(banners) {
+    const resp = await fetch(`${API_BASE}/admin/banners/sort`, {
+        method: 'PUT',
+        headers: {
+            'Authorization': `Bearer ${currentToken}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ banners })
+    });
+    const result = await resp.json();
+    if (!resp.ok || !result.success) {
+        throw new Error(result.message || '更新排序失败');
+    }
 }
 
 // 加载订单列表
@@ -1676,9 +1779,103 @@ function hideCategoryModal() {
 }
 
 // 轮播图相关操作
-function editBanner(id) {
-    // 实现编辑轮播图逻辑
-    console.log('编辑轮播图:', id);
+function showBannerModal(title = '添加轮播图') {
+    const modal = document.getElementById('banner-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    const titleEl = modal.querySelector('.modal-title');
+    if (titleEl) titleEl.textContent = title;
+
+    // reset form
+    document.getElementById('banner-id').value = '';
+    document.getElementById('banner-form').reset();
+    const preview = document.getElementById('banner-image-preview');
+    if (preview) preview.innerHTML = '';
+
+    setTimeout(() => {
+        initCustomDropdowns();
+        setDropdownValue('banner-status-dropdown', '1', '启用');
+    }, 50);
+}
+
+function hideBannerModal() {
+    const modal = document.getElementById('banner-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function editBanner(id) {
+    try {
+        const resp = await fetch(`${API_BASE}/admin/banners/${id}`, {
+            headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        if (!resp.ok) throw new Error('获取轮播图详情失败');
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.message || '获取轮播图详情失败');
+        const b = result.data;
+
+        const modal = document.getElementById('banner-modal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        const titleEl = modal.querySelector('.modal-title');
+        if (titleEl) titleEl.textContent = '编辑轮播图';
+
+        document.getElementById('banner-id').value = b.id;
+        document.getElementById('banner-title').value = b.title || '';
+        document.getElementById('banner-link').value = b.link || '';
+        document.getElementById('banner-sort').value = b.sort_order || 1;
+        setTimeout(() => {
+            initCustomDropdowns();
+            setDropdownValue('banner-status-dropdown', String(b.status ?? 1), b.status == 1 ? '启用' : '禁用');
+        }, 50);
+
+        const preview = document.getElementById('banner-image-preview');
+        if (preview) {
+            preview.innerHTML = b.image ? `<img src="${b.image}" style="max-width: 200px; max-height: 150px; object-fit: cover;">` : '';
+        }
+    } catch (e) {
+        showMessage(e.message, 'error');
+    }
+}
+
+async function saveBannerItem() {
+    try {
+        const id = document.getElementById('banner-id').value.trim();
+        const title = document.getElementById('banner-title').value.trim();
+        const link = document.getElementById('banner-link').value.trim();
+        const sortOrder = parseInt(document.getElementById('banner-sort').value || '1', 10);
+        const status = getDropdownValue('banner-status-dropdown') || '1';
+        const file = document.getElementById('banner-image').files[0];
+
+        if (!title) {
+            showMessage('标题不能为空', 'error');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('title', title);
+        if (link) formData.append('link', link);
+        formData.append('sortOrder', sortOrder);
+        formData.append('status', status);
+        if (file) formData.append('image', file);
+
+        const url = id ? `${API_BASE}/admin/banners/${id}` : `${API_BASE}/admin/banners`;
+        const method = id ? 'PUT' : 'POST';
+        const resp = await fetch(url, {
+            method,
+            headers: { 'Authorization': `Bearer ${currentToken}` },
+            body: formData
+        });
+        const result = await resp.json();
+        if (resp.ok && result.success) {
+            showMessage(id ? '更新成功' : '创建成功', 'success');
+            hideBannerModal();
+            loadBanners();
+        } else {
+            throw new Error(result.message || '保存失败');
+        }
+    } catch (e) {
+        showMessage('保存失败: ' + e.message, 'error');
+    }
 }
 
 function deleteBanner(id) {

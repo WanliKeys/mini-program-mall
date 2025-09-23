@@ -113,17 +113,7 @@
                     </ul>
                 </div>
                 
-                <div class="nav-section">
-                    <div class="nav-section-title">内容管理</div>
-                    <ul class="nav-list">
-                        <li class="nav-item">
-                            <a href="#" class="nav-link" data-page="banners">
-                                <i class="bi bi-image"></i>
-                                <span>轮播图</span>
-                            </a>
-                        </li>
-                    </ul>
-                </div>
+                
                 
                 <div class="nav-section">
                     <div class="nav-section-title">订单管理</div>
@@ -223,19 +213,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-icon info">
-                                <i class="bi bi-image"></i>
-                            </div>
-                            <div class="stat-content">
-                                <div class="stat-value" id="total-banners">-</div>
-                                <div class="stat-label">轮播图总数</div>
-                                <div class="stat-trend positive">
-                                    <i class="bi bi-arrow-up"></i>
-                                    <span>+5%</span>
-                                </div>
-                            </div>
-                        </div>
+                        
                     </div>
 
                     <!-- 快速操作 -->
@@ -269,15 +247,7 @@
                                     <p>组织商品分类结构</p>
                                 </div>
                             </div>
-                            <div class="action-card" onclick="showPage('banners')">
-                                <div class="action-icon">
-                                    <i class="bi bi-image"></i>
-                                </div>
-                                <div class="action-content">
-                                    <h4>轮播图</h4>
-                                    <p>设置首页展示内容</p>
-                                </div>
-                            </div>
+                            
                         </div>
                     </div>
 
@@ -538,50 +508,7 @@
                     </div>
                 </div>
 
-                <!-- 轮播图管理页面 -->
-                <div id="banners-page" class="page" style="display: none;">
-                    <div class="page-header">
-                        <div class="page-title">
-                            <h2>轮播图管理</h2>
-                            <p>管理首页轮播图展示</p>
-                        </div>
-                        <div class="page-actions">
-                            <button class="btn btn-outline" onclick="previewBanners()">
-                                <i class="bi bi-eye"></i> 预览
-                            </button>
-                            <button class="btn btn-primary" onclick="showBannerModal()">
-                                <i class="bi bi-plus"></i> 添加轮播图
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="content-card">
-                        <div class="table-wrapper">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th width="60">ID</th>
-                                        <th>轮播图信息</th>
-                                        <th width="200">跳转链接</th>
-                                        <th width="100">排序</th>
-                                        <th width="100">状态</th>
-                                        <th width="120">操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="banners-table">
-                                    <tr>
-                                        <td colspan="6" class="text-center">
-                                            <div class="loading-state">
-                                                <div class="spinner"></div>
-                                                <p>加载中...</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                
 
                 <!-- 订单管理页面 -->
                 <div id="orders-page" class="page" style="display: none;">
@@ -830,5 +757,7 @@
             </div>
         </div>
     </div>
+
+    
 </body>
-</html>
+</ghtml>
