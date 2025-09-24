@@ -34,19 +34,19 @@
 ## 🔧 安装和配置
 
 ### 1. 安装依赖
-\`\`\`bash
+```bash
 npm install
-\`\`\`
+```
 
 ### 2. 配置环境变量
-复制 \`.env.example\` 为 \`.env\` 并修改配置：
+复制 `.env.example` 为 `.env` 并修改配置：
 
-\`\`\`bash
+```bash
 cp .env.example .env
-\`\`\`
+```
 
 主要配置项：
-\`\`\`env
+```env
 # 数据库配置
 DB_HOST=localhost
 DB_PORT=3306
@@ -60,64 +60,68 @@ JWT_SECRET=your_jwt_secret_key
 # 微信小程序配置
 WECHAT_APPID=your_wechat_appid
 WECHAT_SECRET=your_wechat_secret
-\`\`\`
+```
 
 ### 3. 初始化数据库
-\`\`\`bash
+```bash
 mysql -u root -p < database.sql
-\`\`\`
+```
 
 ### 4. 启动服务
 
 开发环境：
-\`\`\`bash
-npm run dev
-\`\`\`
+```bash
+# 推荐：一键重启（避免多进程残留）
+../../scripts/dev-restart.sh
+
+# 或直接前台跑单实例
+npm run start
+```
 
 生产环境：
-\`\`\`bash
+```bash
 npm start
-\`\`\`
+```
 
 ## 📚 API文档
 
 ### 基础信息
-- **基础URL**: \`http://localhost:3000/api\`
+- **基础URL**: `http://localhost:3000/api`
 - **认证方式**: Bearer Token (JWT)
 - **响应格式**: JSON
 
 ### 主要接口
 
 #### 用户认证
-- \`POST /auth/login\` - 微信小程序登录
-- \`GET /auth/profile\` - 获取用户信息
-- \`PUT /auth/profile\` - 更新用户信息
+- `POST /auth/login` - 微信小程序登录
+- `GET /auth/profile` - 获取用户信息
+- `PUT /auth/profile` - 更新用户信息
 
 #### 商品管理
-- \`GET /products\` - 获取商品列表
-- \`GET /products/:id\` - 获取商品详情
-- \`GET /products/search\` - 搜索商品
+- `GET /products` - 获取商品列表
+- `GET /products/:id` - 获取商品详情
+- `GET /products/search` - 搜索商品
 
 #### 购物车
-- \`GET /cart\` - 获取购物车
-- \`POST /cart\` - 添加到购物车
-- \`PUT /cart/:id\` - 更新商品数量
-- \`DELETE /cart/:id\` - 删除商品
+- `GET /cart` - 获取购物车
+- `POST /cart` - 添加到购物车
+- `PUT /cart/:id` - 更新商品数量
+- `DELETE /cart/:id` - 删除商品
 
 #### 订单管理
-- \`GET /orders\` - 获取订单列表
-- \`POST /orders\` - 创建订单
-- \`GET /orders/:id\` - 获取订单详情
+- `GET /orders` - 获取订单列表
+- `POST /orders` - 创建订单
+- `GET /orders/:id` - 获取订单详情
 
 ## 🎯 引流功能特性
 
 ### 引流订单追踪
 - 支持外部平台订单号传递
-- 订单来源识别（\`source\` 字段）
+- 订单来源识别（`source` 字段）
 - 引流数据统计和分析
 
 ### 使用示例
-\`\`\`javascript
+```javascript
 // 小程序端创建引流订单
 POST /api/orders
 {
@@ -125,7 +129,7 @@ POST /api/orders
   "externalOrderNo": "TK20241215001",
   "source": "external"
 }
-\`\`\`
+```
 
 ## 🔒 安全特性
 
@@ -145,7 +149,7 @@ POST /api/orders
 5. 设置日志轮转
 
 ### Docker部署
-\`\`\`dockerfile
+```dockerfile
 # Dockerfile示例
 FROM node:16-alpine
 WORKDIR /app
@@ -154,7 +158,7 @@ RUN npm ci --only=production
 COPY . .
 EXPOSE 3000
 CMD ["npm", "start"]
-\`\`\`
+```
 
 ## 📈 性能优化
 
@@ -172,8 +176,10 @@ CMD ["npm", "start"]
    - 验证连接配置参数
 
 2. **微信登录失败**
-   - 检查 AppID 和 Secret 配置
-   - 开发环境会自动降级到模拟登录
+   - 检查 AppID 和 Secret 配置（`.env`）并确认重启后生效
+   - 确认每次 `wx.login` 都拿到新 code（避免复用）
+   - 后端仅运行 1 个实例（可用 `../../scripts/dev-restart.sh`）
+   - 直连微信测试：`curl "https://api.weixin.qq.com/sns/jscode2session?..."`
 
 3. **Token验证失败**
    - 检查JWT密钥配置
