@@ -217,10 +217,10 @@ router.post('/', asyncHandler(async (req, res) => {
       ]
     );
     
-    // 更新商品库存和销量
+    // 下单仅锁定库存，不增加销量；支付成功再确认销量
     await query(
-      'UPDATE products SET stock = stock - ?, sales = sales + ? WHERE id = ?',
-      [quantity, quantity, productId]
+      'UPDATE products SET stock = stock - ? WHERE id = ?',
+      [quantity, productId]
     );
     
     // 记录引流日志（按当前表结构）
@@ -348,10 +348,10 @@ router.post('/batch', asyncHandler(async (req, res) => {
         ]
       );
       
-      // 更新商品库存和销量
+      // 批量下单：仅扣减库存，不增加销量
       await query(
-        'UPDATE products SET stock = stock - ?, sales = sales + ? WHERE id = ?',
-        [item.quantity, item.quantity, item.product.id]
+        'UPDATE products SET stock = stock - ? WHERE id = ?',
+        [item.quantity, item.product.id]
       );
       
       // 从购物车中删除商品

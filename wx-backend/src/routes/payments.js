@@ -270,6 +270,12 @@ async function handlePaymentSuccess(paymentNo, thirdPartyNo, paymentMethod) {
     
     if (orders.length > 0) {
       const order = orders[0];
+
+      // 支付成功：确认销量（下单未加销量）
+      const items = await query('SELECT product_id, quantity FROM order_items WHERE order_id = ?', [order.id]);
+      for (const it of items) {
+        await query('UPDATE products SET sales = sales + ? WHERE id = ?', [it.quantity, it.product_id]);
+      }
       // 支付成功后为订单分配卡密（若函数存在）
       if (typeof assignCardCodeToOrder === 'function') {
         await assignCardCodeToOrder(order.id, order.total_amount);
