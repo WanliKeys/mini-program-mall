@@ -2204,7 +2204,7 @@ function updateCardCodesTable() {
     tbody.innerHTML = cardCodeStore.list.map(card => `
         <tr>
             <td>
-                <input type="checkbox" class="card-checkbox" value="${card.id}">
+                <input type="checkbox" class="card-checkbox" value="${card.id}" onchange="updateBatchDeleteButton()">
             </td>
             <td>
                 <span class="card-code-text">${card.code}</span>
@@ -2232,6 +2232,7 @@ function updateCardCodesTable() {
     `).join('');
     
     updateCardCodesPagination();
+    updateBatchDeleteButton();
 }
 
 // 更新卡密分页
@@ -2319,6 +2320,75 @@ function toggleSelectAllCards() {
     checkboxes.forEach(checkbox => {
         checkbox.checked = selectAll.checked;
     });
+    
+    // 更新批量删除按钮显示状态
+    updateBatchDeleteButton();
+}
+
+// 更新批量删除按钮显示状态
+function updateBatchDeleteButton() {
+    const batchDeleteBtn = document.getElementById('batch-delete-btn');
+    const checkboxes = document.querySelectorAll('.card-checkbox:checked');
+    
+    if (checkboxes.length > 0) {
+        batchDeleteBtn.style.display = 'inline-flex';
+        batchDeleteBtn.innerHTML = `<i class="bi bi-trash"></i> 批量删除 (${checkboxes.length})`;
+    } else {
+        batchDeleteBtn.style.display = 'none';
+    }
+}
+
+// 批量删除卡密
+function batchDeleteCardCodes() {
+    const checkboxes = document.querySelectorAll('.card-checkbox:checked');
+    if (checkboxes.length === 0) {
+        showMessage('请选择要删除的卡密', 'error');
+        return;
+    }
+    
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    const cardCodes = selectedIds.map(id => {
+        const card = cardCodeStore.list.find(c => c.id == id);
+        return card ? card.code : `ID:${id}`;
+    }).join(', ');
+    
+    showConfirmModal(
+        `确定要删除选中的 ${selectedIds.length} 个卡密吗？\n\n卡密：${cardCodes}`,
+        (confirmed) => {
+            if (confirmed) {
+                performBatchDeleteCardCodes(selectedIds);
+            }
+        },
+        '批量删除'
+    );
+}
+
+// 执行批量删除卡密
+async function performBatchDeleteCardCodes(ids) {
+    try {
+        const response = await fetch(`${API_BASE}/admin/card-codes/batch`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentToken}`
+            },
+            body: JSON.stringify({ ids })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage(`成功删除 ${data.data.deleted} 个卡密`, 'success');
+            // 重置全选状态
+            document.getElementById('select-all-cards').checked = false;
+            loadCardCodes();
+        } else {
+            throw new Error(data.message || '批量删除失败');
+        }
+    } catch (error) {
+        console.error('批量删除卡密失败:', error);
+        showMessage(error.message || '批量删除失败', 'error');
+    }
 }
 
 // 显示卡密编辑弹窗
