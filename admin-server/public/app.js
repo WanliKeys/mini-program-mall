@@ -2325,16 +2325,21 @@ function toggleSelectAllCards() {
     updateBatchDeleteButton();
 }
 
-// 更新批量删除按钮显示状态
+// 更新批量删除按钮状态
 function updateBatchDeleteButton() {
     const batchDeleteBtn = document.getElementById('batch-delete-btn');
     const checkboxes = document.querySelectorAll('.card-checkbox:checked');
     
+    if (!batchDeleteBtn) return;
+    
     if (checkboxes.length > 0) {
-        batchDeleteBtn.style.display = 'inline-flex';
+        batchDeleteBtn.disabled = false;
         batchDeleteBtn.innerHTML = `<i class="bi bi-trash"></i> 批量删除 (${checkboxes.length})`;
+        batchDeleteBtn.classList.remove('disabled');
     } else {
-        batchDeleteBtn.style.display = 'none';
+        batchDeleteBtn.disabled = true;
+        batchDeleteBtn.innerHTML = `<i class="bi bi-trash"></i> 批量删除`;
+        batchDeleteBtn.classList.add('disabled');
     }
 }
 

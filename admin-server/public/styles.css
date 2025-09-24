@@ -1202,6 +1202,13 @@ body {
     text-decoration: none;
 }
 
+/* 批量删除按钮禁用状态 */
+.btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 /* 分页 */
 .pagination-wrapper {
     padding: 20px 24px;

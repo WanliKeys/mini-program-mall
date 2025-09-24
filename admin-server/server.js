@@ -14,8 +14,8 @@ const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/api';
 // 中间件
 app.use(compression()); // 启用gzip压缩
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // 静态文件服务 - 添加缓存和压缩
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -70,12 +70,34 @@ const proxyRequest = async (req, res, endpoint, method = 'GET', data = null) => 
         'Content-Type': 'application/json'
       }
     };
-    if (data) config.data = data;
+    
+    // 使用传入的data参数，如果没有则使用req.body
+    const requestData = data !== null ? data : req.body;
+    if (requestData) config.data = requestData;
     if (req.query && Object.keys(req.query).length > 0) config.params = req.query;
+    
+    console.log('代理请求:', { 
+      method, 
+      url, 
+      requestData, 
+      reqBody: req.body,
+      headers: config.headers 
+    });
+    
     const response = await axios(config);
+    console.log('代理响应:', response.status, response.data);
     res.status(response.status).json(response.data);
   } catch (error) {
-    console.error('API代理错误:', error.response?.data || error.message);
+    console.error('API代理错误:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      config: {
+        method: error.config?.method,
+        url: error.config?.url,
+        data: error.config?.data
+      }
+    });
     res.status(error.response?.status || 500).json({
       success: false,
       message: error.response?.data?.message || '服务器错误',
@@ -217,7 +239,34 @@ app.post('/api/admin/card-codes', (req, res) => proxyRequest(req, res, '/admin/c
 app.post('/api/admin/card-codes/batch', (req, res) => proxyRequest(req, res, '/admin/card-codes/batch', 'POST', req.body));
 app.put('/api/admin/card-codes/:id', (req, res) => proxyRequest(req, res, `/admin/card-codes/${req.params.id}`, 'PUT', req.body));
 app.delete('/api/admin/card-codes/:id', (req, res) => proxyRequest(req, res, `/admin/card-codes/${req.params.id}`, 'DELETE'));
-app.delete('/api/admin/card-codes/batch', (req, res) => proxyRequest(req, res, '/admin/card-codes/batch', 'DELETE', req.body));
+app.delete('/api/admin/card-codes/batch', (req, res) => {
+  console.log('批量删除请求体:', req.body);
+  console.log('请求头:', req.headers);
+  
+  // 直接转发到后端，不通过代理方法
+  const axios = require('axios');
+  const url = `${API_BASE_URL}/admin/card-codes/batch`;
+  
+  axios({
+    method: 'DELETE',
+    url: url,
+    headers: {
+      'Authorization': req.headers.authorization || '',
+      'Content-Type': 'application/json'
+    },
+    data: req.body
+  }).then(response => {
+    console.log('后端响应:', response.status, response.data);
+    res.status(response.status).json(response.data);
+  }).catch(error => {
+    console.error('后端错误:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      success: false,
+      message: error.response?.data?.message || '服务器错误',
+      error: error.message
+    });
+  });
+});
 
 // 用户资料与密码（代理，如无则后端补齐）
 app.get('/api/admin/profile', (req, res) => proxyRequest(req, res, '/admin/profile'));
