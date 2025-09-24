@@ -6,6 +6,10 @@ const { adminAuth } = require('../../middleware/auth');
 
 const router = express.Router();
 
+// 引入卡密管理路由
+const cardCodesRouter = require('./cardCodes');
+router.use('/card-codes', cardCodesRouter);
+
 // 管理员登录（简单用户名密码，需配合 users 表）
 router.post('/login', asyncHandler(async (req, res) => {
   const { username, password } = req.body || {};

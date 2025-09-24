@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS orders (
   external_order_no VARCHAR(100) DEFAULT NULL COMMENT '外部订单号',
   source ENUM('direct', 'external') DEFAULT 'direct' COMMENT '订单来源',
   external_source VARCHAR(50) DEFAULT NULL COMMENT '外部来源平台',
+  card_code_id INT DEFAULT NULL COMMENT '分配的卡密ID',
   paid_at TIMESTAMP NULL COMMENT '支付时间',
   shipped_at TIMESTAMP NULL COMMENT '发货时间',
   completed_at TIMESTAMP NULL COMMENT '完成时间',
@@ -99,10 +100,12 @@ CREATE TABLE IF NOT EXISTS orders (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (address_id) REFERENCES addresses(id),
+  FOREIGN KEY (card_code_id) REFERENCES card_codes(id),
   INDEX idx_user (user_id),
   INDEX idx_status (status),
   INDEX idx_source (source),
-  INDEX idx_external_order (external_order_no)
+  INDEX idx_external_order (external_order_no),
+  INDEX idx_card_code (card_code_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单表';
 
 -- 订单商品表
@@ -156,6 +159,19 @@ CREATE TABLE IF NOT EXISTS referral_logs (
   INDEX idx_source (source_platform),
   INDEX idx_action (action_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='引流跟踪表';
+
+-- 卡密表
+CREATE TABLE IF NOT EXISTS card_codes (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  code VARCHAR(100) NOT NULL UNIQUE COMMENT '卡密内容',
+  price DECIMAL(10,2) NOT NULL COMMENT '对应价格',
+  status ENUM('unused', 'shipped') DEFAULT 'unused' COMMENT '状态：未使用、已发货',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_price (price),
+  INDEX idx_status (status),
+  INDEX idx_price_status (price, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='卡密表';
 
 -- 插入初始数据
 -- 商品分类

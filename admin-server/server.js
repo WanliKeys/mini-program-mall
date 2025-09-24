@@ -210,6 +210,15 @@ app.get('/api/admin/orders', (req, res) => proxyRequest(req, res, '/admin/orders
 app.get('/api/admin/orders/:id', (req, res) => proxyRequest(req, res, `/admin/orders/${req.params.id}`));
 app.put('/api/admin/orders/:id/status', (req, res) => proxyRequest(req, res, `/admin/orders/${req.params.id}/status`, 'PUT', req.body));
 
+// 卡密管理（代理）
+app.get('/api/admin/card-codes', (req, res) => proxyRequest(req, res, '/admin/card-codes'));
+app.get('/api/admin/card-codes/stats', (req, res) => proxyRequest(req, res, '/admin/card-codes/stats'));
+app.post('/api/admin/card-codes', (req, res) => proxyRequest(req, res, '/admin/card-codes', 'POST', req.body));
+app.post('/api/admin/card-codes/batch', (req, res) => proxyRequest(req, res, '/admin/card-codes/batch', 'POST', req.body));
+app.put('/api/admin/card-codes/:id', (req, res) => proxyRequest(req, res, `/admin/card-codes/${req.params.id}`, 'PUT', req.body));
+app.delete('/api/admin/card-codes/:id', (req, res) => proxyRequest(req, res, `/admin/card-codes/${req.params.id}`, 'DELETE'));
+app.delete('/api/admin/card-codes/batch', (req, res) => proxyRequest(req, res, '/admin/card-codes/batch', 'DELETE', req.body));
+
 // 用户资料与密码（代理，如无则后端补齐）
 app.get('/api/admin/profile', (req, res) => proxyRequest(req, res, '/admin/profile'));
 app.put('/api/admin/profile', (req, res) => proxyRequest(req, res, '/admin/profile', 'PUT', req.body));

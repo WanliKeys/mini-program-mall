@@ -256,6 +256,9 @@ function showPage(pageName) {
             targetPage.style.display = 'block';
         }
         
+        // 加载页面数据
+        loadPageData(pageName);
+        
         // 更新页面标题
         const pageTitle = document.getElementById('page-title');
         if (pageTitle) {
@@ -264,7 +267,8 @@ function showPage(pageName) {
                 'products': '商品管理',
                 'categories': '商品分类',
                 'banners': '轮播图管理',
-                'orders': '订单管理'
+                'orders': '订单管理',
+                'card-codes': '卡密管理'
             };
             pageTitle.textContent = titles[pageName] || '管理后台';
         }
@@ -368,6 +372,13 @@ function loadPageData(pageName) {
             setDefaultOrderDateRange();
             loadOrders();
             // 初始化订单筛选下拉框
+            setTimeout(() => {
+                initCustomDropdowns();
+            }, 100);
+            break;
+        case 'card-codes':
+            loadCardCodes();
+            // 初始化卡密筛选下拉框
             setTimeout(() => {
                 initCustomDropdowns();
             }, 100);
@@ -2058,4 +2069,455 @@ function changePassword() {
     // TODO: 调用后端修改密码，这里直接提示成功
     showMessage('密码修改成功', 'success');
     closeChangePasswordModal();
+}
+
+// ==================== 卡密管理功能 ====================
+
+// 格式化日期函数
+function formatDate(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// 卡密状态管理
+const cardCodeStore = {
+    list: [],
+    loading: false,
+    error: null,
+    pagination: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
+    filters: { search: '', price: '', status: '' }
+};
+
+// 加载卡密列表
+async function loadCardCodes() {
+    try {
+        cardCodeStore.loading = true;
+        updateCardCodesTable();
+        
+        // 读取筛选参数
+        const search = document.getElementById('card-code-search')?.value || '';
+        const price = document.getElementById('card-code-price')?.value || '';
+        const statusDropdown = document.getElementById('card-code-status-dropdown');
+        const status = statusDropdown?.querySelector('.dropdown-item.active')?.dataset.value || '';
+        
+        // 更新筛选条件
+        cardCodeStore.filters = { search, price, status };
+        
+        const params = new URLSearchParams({
+            page: cardCodeStore.pagination.page,
+            pageSize: cardCodeStore.pagination.pageSize,
+            ...cardCodeStore.filters
+        });
+        
+        const response = await fetch(`${API_BASE}/admin/card-codes?${params}`, {
+            headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            cardCodeStore.list = data.data.list;
+            cardCodeStore.pagination = data.data.pagination;
+            cardCodeStore.error = null;
+            console.log('卡密数据加载成功，准备更新表格:', cardCodeStore.list.length, '条记录');
+        } else {
+            throw new Error(data.message || '加载失败');
+        }
+    } catch (error) {
+        console.error('加载卡密列表失败:', error);
+        cardCodeStore.error = error.message;
+        cardCodeStore.list = [];
+    } finally {
+        cardCodeStore.loading = false;
+        updateCardCodesTable();
+    }
+}
+
+// 更新卡密表格
+function updateCardCodesTable() {
+    const tbody = document.getElementById('card-codes-table');
+    if (!tbody) {
+        console.error('找不到卡密表格元素: card-codes-table');
+        return;
+    }
+    
+    console.log('更新卡密表格，状态:', {
+        loading: cardCodeStore.loading,
+        error: cardCodeStore.error,
+        listLength: cardCodeStore.list.length
+    });
+    
+    if (cardCodeStore.loading) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center">
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>加载中...</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    if (cardCodeStore.error) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center">
+                    <div class="error-state">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <p>${cardCodeStore.error}</p>
+                        <button class="btn btn-sm btn-outline" onclick="loadCardCodes()">重试</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    if (cardCodeStore.list.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center">
+                    <div class="empty-state">
+                        <i class="bi bi-inbox"></i>
+                        <p>暂无卡密数据</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = cardCodeStore.list.map(card => `
+        <tr>
+            <td>
+                <input type="checkbox" class="card-checkbox" value="${card.id}">
+            </td>
+            <td>
+                <span class="card-code-text">${card.code}</span>
+            </td>
+            <td>¥${card.price}</td>
+            <td>
+                <span class="status-badge status-${card.status}">
+                    ${card.status === 'unused' ? '未使用' : '已发货'}
+                </span>
+            </td>
+            <td>${formatDate(card.created_at)}</td>
+            <td>
+                <div class="action-buttons">
+                    <button class="action-btn" onclick="editCardCode(${card.id})" title="编辑">
+                        <i class="bi bi-pencil"></i>
+                        <span>编辑</span>
+                    </button>
+                    <button class="action-btn danger" onclick="deleteCardCode(${card.id})" title="删除">
+                        <i class="bi bi-trash"></i>
+                        <span>删除</span>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+    
+    updateCardCodesPagination();
+}
+
+// 更新卡密分页
+function updateCardCodesPagination() {
+    const pagination = document.getElementById('card-codes-pagination');
+    if (!pagination) return;
+    
+    const { page, totalPages } = cardCodeStore.pagination;
+    
+    if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+    }
+    
+    let html = '';
+    
+    // 上一页
+    if (page > 1) {
+        html += `<button class="pagination-btn" onclick="changeCardCodePage(${page - 1})">
+            <i class="bi bi-chevron-left"></i>
+        </button>`;
+    }
+    
+    // 页码
+    const startPage = Math.max(1, page - 2);
+    const endPage = Math.min(totalPages, page + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="pagination-btn ${i === page ? 'active' : ''}" 
+                onclick="changeCardCodePage(${i})">${i}</button>`;
+    }
+    
+    // 下一页
+    if (page < totalPages) {
+        html += `<button class="pagination-btn" onclick="changeCardCodePage(${page + 1})">
+            <i class="bi bi-chevron-right"></i>
+        </button>`;
+    }
+    
+    pagination.innerHTML = html;
+}
+
+// 切换卡密页面
+function changeCardCodePage(page) {
+    cardCodeStore.pagination.page = page;
+    loadCardCodes();
+}
+
+// 重置卡密筛选条件
+function resetCardCodeFilters() {
+    cardCodeStore.filters = { search: '', price: '', status: '' };
+    cardCodeStore.pagination.page = 1;
+    
+    // 清空表单
+    document.getElementById('card-code-search').value = '';
+    document.getElementById('card-code-price').value = '';
+    
+    // 重置状态下拉框
+    const statusDropdown = document.getElementById('card-code-status-dropdown');
+    if (statusDropdown) {
+        const trigger = statusDropdown.querySelector('.dropdown-trigger .dropdown-text');
+        const items = statusDropdown.querySelectorAll('.dropdown-item');
+        if (trigger) trigger.textContent = '所有状态';
+        items.forEach(item => item.classList.remove('active'));
+        items[0].classList.add('active');
+    }
+    
+    loadCardCodes();
+}
+
+// 复制卡密
+function copyCardCode(code) {
+    navigator.clipboard.writeText(code).then(() => {
+        showMessage('卡密已复制到剪贴板', 'success');
+    }).catch(() => {
+        showMessage('复制失败', 'error');
+    });
+}
+
+// 全选/取消全选卡密
+function toggleSelectAllCards() {
+    const selectAll = document.getElementById('select-all-cards');
+    const checkboxes = document.querySelectorAll('.card-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+}
+
+// 显示卡密编辑弹窗
+function showCardCodeModal(cardId = null) {
+    const modal = document.getElementById('card-code-modal');
+    const form = document.getElementById('card-code-form');
+    const title = modal.querySelector('.modal-title');
+    
+    if (cardId) {
+        title.textContent = '编辑卡密';
+        const card = cardCodeStore.list.find(c => c.id === cardId);
+        if (card) {
+            document.getElementById('card-code').value = card.code;
+            document.getElementById('card-price').value = card.price;
+            // 设置状态下拉框
+            const statusDropdown = document.getElementById('card-status-dropdown');
+            if (statusDropdown) {
+                const trigger = statusDropdown.querySelector('.dropdown-trigger .dropdown-text');
+                const items = statusDropdown.querySelectorAll('.dropdown-item');
+                items.forEach(item => {
+                    item.classList.remove('active');
+                    if (item.dataset.value === card.status) {
+                        item.classList.add('active');
+                        trigger.textContent = item.querySelector('span').textContent;
+                    }
+                });
+            }
+        }
+    } else {
+        title.textContent = '添加卡密';
+        form.reset();
+        // 重置状态为未使用
+        const statusDropdown = document.getElementById('card-status-dropdown');
+        if (statusDropdown) {
+            const trigger = statusDropdown.querySelector('.dropdown-trigger .dropdown-text');
+            const items = statusDropdown.querySelectorAll('.dropdown-item');
+            items.forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.value === 'unused') {
+                    item.classList.add('active');
+                    trigger.textContent = '未使用';
+                }
+            });
+        }
+    }
+    
+    modal.style.display = 'flex';
+    modal.dataset.cardId = cardId || '';
+}
+
+// 隐藏卡密编辑弹窗
+function hideCardCodeModal() {
+    const modal = document.getElementById('card-code-modal');
+    modal.style.display = 'none';
+    modal.dataset.cardId = '';
+}
+
+// 保存卡密
+async function saveCardCode() {
+    const form = document.getElementById('card-code-form');
+    const cardId = document.getElementById('card-code-modal').dataset.cardId;
+    
+    const code = document.getElementById('card-code').value.trim();
+    const price = document.getElementById('card-price').value;
+    const status = document.querySelector('#card-status-dropdown .dropdown-item.active').dataset.value;
+    
+    if (!code || !price) {
+        showMessage('请填写完整信息', 'error');
+        return;
+    }
+    
+    try {
+        const url = cardId ? 
+            `${API_BASE}/admin/card-codes/${cardId}` : 
+            `${API_BASE}/admin/card-codes`;
+        
+        const method = cardId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentToken}`
+            },
+            body: JSON.stringify({ code, price: parseFloat(price), status })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage(cardId ? '卡密更新成功' : '卡密添加成功', 'success');
+            hideCardCodeModal();
+            loadCardCodes();
+        } else {
+            throw new Error(data.message || '操作失败');
+        }
+    } catch (error) {
+        console.error('保存卡密失败:', error);
+        showMessage(error.message || '保存失败', 'error');
+    }
+}
+
+// 编辑卡密
+function editCardCode(cardId) {
+    showCardCodeModal(cardId);
+}
+
+// 删除卡密
+function deleteCardCode(cardId) {
+    const card = cardCodeStore.list.find(c => c.id === cardId);
+    if (!card) return;
+    
+    showConfirmModal(
+        `确定要删除卡密 "${card.code}" 吗？`,
+        (confirmed) => {
+            if (confirmed) {
+                performDeleteCardCode(cardId);
+            }
+        },
+        '删除'
+    );
+}
+
+// 执行删除卡密
+async function performDeleteCardCode(cardId) {
+    try {
+        const response = await fetch(`${API_BASE}/admin/card-codes/${cardId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage('卡密删除成功', 'success');
+            loadCardCodes();
+        } else {
+            throw new Error(data.message || '删除失败');
+        }
+    } catch (error) {
+        console.error('删除卡密失败:', error);
+        showMessage(error.message || '删除失败', 'error');
+    }
+}
+
+// 显示批量导入弹窗
+function showBatchImportModal() {
+    const modal = document.getElementById('batch-import-modal');
+    modal.style.display = 'flex';
+}
+
+// 隐藏批量导入弹窗
+function hideBatchImportModal() {
+    const modal = document.getElementById('batch-import-modal');
+    modal.style.display = 'none';
+    document.getElementById('batch-import-modal').querySelector('form')?.reset();
+}
+
+// 批量导入卡密
+async function batchImportCardCodes() {
+    const price = document.getElementById('batch-price').value;
+    const codesText = document.getElementById('batch-codes').value.trim();
+    
+    if (!price || !codesText) {
+        showMessage('请填写价格和卡密列表', 'error');
+        return;
+    }
+    
+    // 处理卡密列表
+    const codes = codesText.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+    
+    if (codes.length === 0) {
+        showMessage('请输入有效的卡密', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/admin/card-codes/batch`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentToken}`
+            },
+            body: JSON.stringify({ codes, price: parseFloat(price) })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage(`成功导入 ${data.data.inserted} 个卡密`, 'success');
+            hideBatchImportModal();
+            loadCardCodes();
+        } else {
+            throw new Error(data.message || '导入失败');
+        }
+    } catch (error) {
+        console.error('批量导入卡密失败:', error);
+        showMessage(error.message || '导入失败', 'error');
+    }
 }
