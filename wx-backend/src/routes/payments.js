@@ -51,8 +51,12 @@ router.post('/pay', asyncHandler(async (req, res) => {
     }
     
     let paymentData = {};
-    
-    if (paymentMethod === 'wechat') {
+
+    // 模拟支付开关：最小改动，直接走成功路径（用于联调/发卡密流程验证）
+    if (process.env.WECHAT_PAY_MOCK === 'true') {
+      await handlePaymentSuccess(paymentNo, 'MOCK_TRANSACTION', 'wechat');
+      paymentData = { paymentId, paymentNo, paymentMethod: 'wechat', mock: true };
+    } else if (paymentMethod === 'wechat') {
       // 微信支付
       try {
         const wechatPay = new WeChatPay();
@@ -200,7 +204,10 @@ router.get('/status/:paymentNo', asyncHandler(async (req, res) => {
     const paymentNo = req.params.paymentNo;
     
     const payments = await query(
-      'SELECT * FROM payments WHERE payment_no = ? AND user_id = ?',
+      `SELECT p.*
+       FROM payments p
+       JOIN orders o ON o.id = p.order_id
+       WHERE p.payment_no = ? AND o.user_id = ?`,
       [paymentNo, userId]
     );
     
@@ -215,7 +222,7 @@ router.get('/status/:paymentNo', asyncHandler(async (req, res) => {
       status: payment.status,
       amount: parseFloat(payment.amount),
       paymentMethod: payment.payment_method,
-      thirdPartyNo: payment.third_party_no,
+      thirdPartyNo: payment.transaction_id,
       paidAt: payment.paid_at,
       createdAt: payment.created_at
     }, '获取支付状态成功');
@@ -232,8 +239,8 @@ async function handlePaymentSuccess(paymentNo, thirdPartyNo, paymentMethod) {
   try {
     // 更新支付记录
     await query(
-      'UPDATE payments SET status = ?, third_party_no = ?, paid_at = NOW(), updated_at = NOW() WHERE payment_no = ?',
-      ['paid', thirdPartyNo, paymentNo]
+      'UPDATE payments SET status = ?, transaction_id = ?, paid_at = NOW(), updated_at = NOW() WHERE payment_no = ?',
+      ['success', thirdPartyNo, paymentNo]
     );
     
     // 获取支付记录
