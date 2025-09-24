@@ -38,8 +38,6 @@ router.get('/stats', asyncHandler(async (req, res) => {
   }
 }));
 
-// 最近订单功能已下线，相关接口已移除
-
 /**
  * 获取订单列表
  * GET /api/orders
@@ -61,7 +59,8 @@ router.get('/', asyncHandler(async (req, res) => {
     
     // 使用子查询聚合订单项，避免 ONLY_FULL_GROUP_BY 问题
     const orders = await query(
-      `SELECT o.*, items.items_json AS items
+      `SELECT o.*, items.items_json AS items, 
+              cc.id as card_code_id, cc.code as card_code, cc.price as card_price, cc.status as card_status
        FROM orders o
        LEFT JOIN (
          SELECT oi.order_id, 
@@ -77,6 +76,7 @@ router.get('/', asyncHandler(async (req, res) => {
          FROM order_items oi
          GROUP BY oi.order_id
        ) items ON items.order_id = o.id
+       LEFT JOIN card_codes cc ON cc.id = o.card_code_id
        ${whereClause}
        ORDER BY o.created_at DESC 
        LIMIT ? OFFSET ?`,
@@ -97,9 +97,23 @@ router.get('/', asyncHandler(async (req, res) => {
           parsedItems = [];
         }
       }
+      
+      // 处理卡密信息
+      let cardCodeInfo = null;
+      if (order.card_code_id && order.card_code) {
+        cardCodeInfo = {
+          id: order.card_code_id,
+          code: order.card_code,
+          price: parseFloat(order.card_price),
+          status: order.card_status,
+          statusText: order.card_status === 'shipped' ? '已发货' : '未使用'
+        };
+      }
+      
       return {
         ...order,
-        items: parsedItems
+        items: parsedItems,
+        cardCode: cardCodeInfo
       };
     });
     
@@ -479,6 +493,27 @@ router.get('/:id', asyncHandler(async (req, res) => {
     
     const address = addresses[0] || {};
 
+    // 获取分配的卡密信息
+    let cardCodeInfo = null;
+    if (order.card_code_id) {
+      const cardCodes = await query(
+        'SELECT id, code, price, status, created_at FROM card_codes WHERE id = ?',
+        [order.card_code_id]
+      );
+      
+      if (cardCodes.length > 0) {
+        const card = cardCodes[0];
+        cardCodeInfo = {
+          id: card.id,
+          code: card.code,
+          price: parseFloat(card.price),
+          status: card.status,
+          statusText: card.status === 'shipped' ? '已发货' : '未使用',
+          createdAt: card.created_at
+        };
+      }
+    }
+
     const data = {
       id: order.id,
       orderNo: order.order_no,
@@ -490,6 +525,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
         address: address.detail ? `${address.province} ${address.city} ${address.district} ${address.detail}` : ''
       },
       items: formattedItems,
+      cardCode: cardCodeInfo, // 添加卡密信息
       createdAt: order.created_at
     };
 

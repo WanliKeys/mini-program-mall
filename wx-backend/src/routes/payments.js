@@ -8,6 +8,7 @@ const axios = require('axios');
 const moment = require('moment');
 const WeChatPay = require('../utils/wechatPay');
 const AliPay = require('../utils/alipay');
+const { beginTransaction, commit, rollback } = require('../config/database');
 
 // 所有支付接口都需要认证
 router.use(authenticate);
@@ -269,7 +270,13 @@ async function handlePaymentSuccess(paymentNo, thirdPartyNo, paymentMethod) {
     
     if (orders.length > 0) {
       const order = orders[0];
-      
+      // 支付成功后为订单分配卡密（若函数存在）
+      if (typeof assignCardCodeToOrder === 'function') {
+        await assignCardCodeToOrder(order.id, order.total_amount);
+      } else {
+        console.warn('assignCardCodeToOrder 未定义，跳过卡密分配');
+      }
+
       // 调用第三方接口通知支付成功
       await notifyThirdParty(order, payment);
     }
@@ -320,3 +327,30 @@ async function notifyThirdParty(order, payment) {
 }
 
 module.exports = router;
+ 
+// 分配卡密到订单（按价格精确匹配）
+async function assignCardCodeToOrder(orderId, orderAmount) {
+  // 使用事务与行锁，避免并发重复分配
+  const conn = await beginTransaction();
+  try {
+    const [cards] = await conn.execute(
+      'SELECT id, code FROM card_codes WHERE price = ? AND status = "unused" ORDER BY id ASC LIMIT 1 FOR UPDATE',
+      [orderAmount]
+    );
+    if (!cards || cards.length === 0) {
+      await rollback(conn);
+      console.warn(`[card] 未找到可用卡密: price=${orderAmount}`);
+      return { success: false };
+    }
+    const card = cards[0];
+    await conn.execute('UPDATE card_codes SET status = "shipped", updated_at = NOW() WHERE id = ?', [card.id]);
+    await conn.execute('UPDATE orders SET card_code_id = ?, updated_at = NOW() WHERE id = ?', [card.id, orderId]);
+    await commit(conn);
+    console.log(`[card] 订单 ${orderId} 分配卡密 ${card.code}`);
+    return { success: true, cardId: card.id };
+  } catch (e) {
+    await rollback(conn).catch(()=>{});
+    console.error('分配卡密失败:', e.message || e);
+    return { success: false };
+  }
+}
