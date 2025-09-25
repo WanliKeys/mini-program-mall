@@ -5,6 +5,7 @@ const { authenticate } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { query } = require('../config/database');
 const moment = require('moment');
+const { createReservation, getAvailableStock } = require('../utils/inventory');
 
 // 所有订单接口都需要认证
 router.use(authenticate);
@@ -155,9 +156,16 @@ router.post('/', asyncHandler(async (req, res) => {
     
     const product = products[0];
     
-    // 检查库存
-    if (product.stock < quantity) {
-      return error(res, '库存不足', 400);
+    // 检查可售库存（考虑卡密库存）
+    const availableStock = await getAvailableStock(productId);
+    if (availableStock < quantity) {
+      return error(res, `库存不足，当前可售${availableStock}件，需要${quantity}件`, 400);
+    }
+    
+    // 创建预分配
+    const reservation = await createReservation(productId, quantity, userId);
+    if (!reservation.success) {
+      return error(res, reservation.message, 400);
     }
     
     // 获取地址信息
@@ -191,11 +199,11 @@ router.post('/', asyncHandler(async (req, res) => {
     const orderResult = await query(
       `INSERT INTO orders (
         order_no, user_id, address_id, total_amount, payment_method, status, remark, external_order_no, source,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        reservation_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         orderNo, userId, addressId, totalAmount, paymentMethod, 'pending', remark || null,
-        externalOrderNo || null, source
+        externalOrderNo || null, source, reservation.reservationId
       ]
     );
     

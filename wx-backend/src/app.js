@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const { testConnection, ensureAdminSetup } = require('./config/database');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const { cleanupExpiredReservations } = require('./utils/inventory');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -95,6 +96,7 @@ const startServer = async () => {
 
     // 启动未支付订单超时取消任务
     startUnpaidOrderScheduler(app);
+    startReservationCleanupScheduler();
   } catch (error) {
     console.error('❌ 服务器启动失败:', error);
     process.exit(1);
@@ -146,6 +148,23 @@ function startUnpaidOrderScheduler(appInstance) {
       }
     } catch (err) {
       console.error('未支付订单超时任务失败:', err.message || err);
+    }
+  }, intervalMs);
+}
+
+// 定时任务：清理过期预分配
+function startReservationCleanupScheduler() {
+  const intervalMs = 5 * 60 * 1000; // 每5分钟
+  console.log(`⏰ 预分配清理任务已启动，每${intervalMs / 1000 / 60}分钟检查一次`);
+
+  setInterval(async () => {
+    try {
+      const result = await cleanupExpiredReservations();
+      if (result.success && result.expiredCount > 0) {
+        console.log(`⏰ 清理过期预分配完成: ${result.message}`);
+      }
+    } catch (err) {
+      console.error('预分配清理任务失败:', err.message || err);
     }
   }, intervalMs);
 }

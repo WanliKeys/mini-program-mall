@@ -3,6 +3,7 @@ const { query } = require('../config/database');
 const { success, error, paginate } = require('../utils/response');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { optionalAuth } = require('../middleware/auth');
+const { getBatchAvailableStock, getAvailableStock } = require('../utils/inventory');
 
 const router = express.Router();
 
@@ -68,6 +69,7 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
     SELECT 
       p.id, p.name, p.description, p.image, p.images, 
       p.price, p.original_price, p.stock, p.sales, p.tags,
+      p.card_price, p.card_stock,
       c.name as category_name
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
@@ -75,6 +77,10 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
     ORDER BY p.${sortField} ${order}
     LIMIT ${parseInt(pageSize)} OFFSET ${offset}
   `, queryParams);
+
+  // 批量计算可售库存
+  const productIds = products.map(p => p.id);
+  const availableStockMap = await getBatchAvailableStock(productIds);
 
   // 处理JSON字段
   const processedProducts = products.map(product => {
@@ -114,7 +120,8 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
       images,
       tags,
       price: parseFloat(product.price),
-      original_price: product.original_price ? parseFloat(product.original_price) : null
+      original_price: product.original_price ? parseFloat(product.original_price) : null,
+      available_stock: availableStockMap[product.id] || 0
     };
   });
 
@@ -142,6 +149,9 @@ router.get('/:id', optionalAuth, asyncHandler(async (req, res) => {
   }
 
   const product = products[0];
+  
+  // 计算可售库存
+  const availableStock = await getAvailableStock(id);
   
   // 安全处理JSON字段
   let images = [];
@@ -178,7 +188,8 @@ router.get('/:id', optionalAuth, asyncHandler(async (req, res) => {
   const processedProduct = {
     ...product,
     images,
-    tags
+    tags,
+    available_stock: availableStock
   };
 
   success(res, processedProduct, '获取商品详情成功');

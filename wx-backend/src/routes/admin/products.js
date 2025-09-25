@@ -5,6 +5,7 @@ const { query } = require('../../config/database');
 const { success, error } = require('../../utils/response');
 const { asyncHandler } = require('../../middleware/errorHandler');
 const { adminAuth } = require('../../middleware/auth');
+const { getCardAvailableStock } = require('../../utils/inventory');
 
 const router = express.Router();
 
@@ -88,6 +89,10 @@ router.get('/', asyncHandler(async (req, res) => {
     `;
     console.log('[AdminProducts] where ->', whereClause);
     const products = await query(listSql);
+    
+    // 批量计算卡密可售库存
+    const productIds = products.map(p => p.id);
+    const cardAvailableStockMap = await getCardAvailableStock(productIds);
 
     const countSql = `
       SELECT COUNT(*) AS total
@@ -120,7 +125,8 @@ router.get('/', asyncHandler(async (req, res) => {
       return {
         ...product,
         images,
-        tags
+        tags,
+        card_available_stock: cardAvailableStockMap[product.id] || 0
       };
     });
 
@@ -201,7 +207,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
  * 创建商品
  * POST /api/admin/products
  */
-router.post('/', upload.single('image'), asyncHandler(async (req, res) => {
+router.post('/', asyncHandler(async (req, res) => {
   try {
     const {
       categoryId,
@@ -211,16 +217,30 @@ router.post('/', upload.single('image'), asyncHandler(async (req, res) => {
       originalPrice,
       stock,
       status = 1,
-      tags
+      tags,
+      image: imageFromBody
     } = req.body;
+    console.log('[admin.products.create] received body:', {
+      categoryId,
+      name,
+      description,
+      price,
+      originalPrice,
+      stock,
+      status,
+      tags,
+      imageFromBody
+    });
     
     // 验证必填字段
     if (!categoryId || !name || !price) {
       return error(res, '分类ID、商品名称和价格不能为空', 400);
     }
     
-    // 处理图片路径
-    const image = req.file ? `/uploads/images/products/${req.file.filename}` : null;
+    // 处理图片路径：优先使用上传文件，其次使用请求体中的 image 字段
+    const image = req.file
+      ? `/uploads/images/products/${req.file.filename}`
+      : (imageFromBody || null);
     
     // 处理标签
     let tagsArray = [];
@@ -232,15 +252,26 @@ router.post('/', upload.single('image'), asyncHandler(async (req, res) => {
       }
     }
     
-    const result = await query(`
+    const insertSql = `
       INSERT INTO products (
-        category_id, name, description, image, price, original_price, 
+        category_id, name, description, image, images, price, original_price,
         stock, status, tags, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-    `, [
-      categoryId, name, description, image, price, originalPrice,
-      stock || 0, status, JSON.stringify(tagsArray)
-    ]);
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+    `;
+    const insertValues = [
+      categoryId,
+      name,
+      description,
+      image,
+      image ? JSON.stringify([image]) : JSON.stringify([]),
+      price,
+      originalPrice,
+      stock || 0,
+      status,
+      JSON.stringify(tagsArray)
+    ];
+    console.log('[admin.products.create] insert image:', image);
+    const result = await query(insertSql, insertValues);
     
     const productId = result.insertId;
     
@@ -256,7 +287,7 @@ router.post('/', upload.single('image'), asyncHandler(async (req, res) => {
  * 更新商品
  * PUT /api/admin/products/:id
  */
-router.put('/:id', upload.single('image'), asyncHandler(async (req, res) => {
+router.put('/:id', asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -270,6 +301,7 @@ router.put('/:id', upload.single('image'), asyncHandler(async (req, res) => {
       tags,
       image
     } = req.body;
+    console.log('[admin.products.update] id:', id, 'body.image:', image);
     
     // 检查商品是否存在
     const existingProducts = await query(
@@ -333,17 +365,8 @@ router.put('/:id', upload.single('image'), asyncHandler(async (req, res) => {
       updateValues.push(JSON.stringify(tagsArray));
     }
     
-    // 处理图片更新
-    if (req.file) {
-      // 通过文件上传更新图片
-      const imageUrl = `/uploads/images/products/${req.file.filename}`;
-      updateFields.push('image = ?');
-      updateValues.push(imageUrl);
-      
-      // 同时更新images字段，将新图片添加到images数组中
-      updateFields.push('images = ?');
-      updateValues.push(JSON.stringify([imageUrl]));
-    } else if (image) {
+    // 处理图片更新（仅接收JSON中的image，由独立上传接口负责存储文件）
+    if (image) {
       // 通过JSON请求体更新图片
       updateFields.push('image = ?');
       updateValues.push(image);

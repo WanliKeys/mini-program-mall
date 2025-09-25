@@ -119,14 +119,12 @@ app.get('/api/admin/dashboard', async (req, res) => {
 // 商品管理（代理到 wx-backend）
 app.get('/api/admin/products', (req, res) => proxyRequest(req, res, '/admin/products'));
 app.get('/api/admin/products/:id', (req, res) => proxyRequest(req, res, `/admin/products/${req.params.id}`));
-app.post('/api/admin/products', upload.single('image'), async (req, res) => {
+app.post('/api/admin/products', async (req, res) => {
   const formData = { ...req.body };
-  if (req.file) formData.image = `/uploads/${req.file.filename}`;
   return proxyRequest(req, res, '/admin/products', 'POST', formData);
 });
-app.put('/api/admin/products/:id', upload.single('image'), async (req, res) => {
+app.put('/api/admin/products/:id', async (req, res) => {
   const formData = { ...req.body };
-  if (req.file) formData.image = `/uploads/${req.file.filename}`;
   return proxyRequest(req, res, `/admin/products/${req.params.id}`, 'PUT', formData);
 });
 app.delete('/api/admin/products/:id', (req, res) => proxyRequest(req, res, `/admin/products/${req.params.id}`, 'DELETE'));

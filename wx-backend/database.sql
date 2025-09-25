@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS products (
   original_price DECIMAL(10,2) DEFAULT NULL COMMENT '原价',
   stock INT DEFAULT 0 COMMENT '库存',
   sales INT DEFAULT 0 COMMENT '销量',
+  card_price DECIMAL(10,2) DEFAULT NULL COMMENT '卡密价格',
+  card_stock INT DEFAULT 0 COMMENT '卡密库存',
   status TINYINT DEFAULT 1 COMMENT '状态 0-下架 1-上架',
   tags JSON COMMENT '标签',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -93,6 +95,7 @@ CREATE TABLE IF NOT EXISTS orders (
   source ENUM('direct', 'external') DEFAULT 'direct' COMMENT '订单来源',
   external_source VARCHAR(50) DEFAULT NULL COMMENT '外部来源平台',
   card_code_id INT DEFAULT NULL COMMENT '分配的卡密ID',
+  reservation_id INT DEFAULT NULL COMMENT '预分配ID',
   paid_at TIMESTAMP NULL COMMENT '支付时间',
   shipped_at TIMESTAMP NULL COMMENT '发货时间',
   completed_at TIMESTAMP NULL COMMENT '完成时间',
@@ -101,6 +104,7 @@ CREATE TABLE IF NOT EXISTS orders (
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (address_id) REFERENCES addresses(id),
   FOREIGN KEY (card_code_id) REFERENCES card_codes(id),
+  FOREIGN KEY (reservation_id) REFERENCES product_reservations(id),
   INDEX idx_user (user_id),
   INDEX idx_status (status),
   INDEX idx_source (source),
@@ -172,6 +176,21 @@ CREATE TABLE IF NOT EXISTS card_codes (
   INDEX idx_status (status),
   INDEX idx_price_status (price, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='卡密表';
+
+-- 商品预分配表
+CREATE TABLE IF NOT EXISTS product_reservations (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  product_id INT NOT NULL COMMENT '商品ID',
+  user_id INT DEFAULT NULL COMMENT '用户ID',
+  quantity INT NOT NULL COMMENT '预分配数量',
+  expires_at TIMESTAMP NOT NULL COMMENT '过期时间',
+  status ENUM('reserved', 'confirmed', 'expired') DEFAULT 'reserved' COMMENT '状态：预分配、已确认、已过期',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  INDEX idx_expires (expires_at),
+  INDEX idx_product (product_id),
+  INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品预分配表';
 
 -- 插入初始数据
 -- 商品分类

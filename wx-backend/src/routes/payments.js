@@ -6,6 +6,7 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { query } = require('../config/database');
 const axios = require('axios');
 const moment = require('moment');
+const { confirmReservation, assignCardCodes } = require('../utils/inventory');
 const WeChatPay = require('../utils/wechatPay');
 const AliPay = require('../utils/alipay');
 const { beginTransaction, commit, rollback } = require('../config/database');
@@ -276,11 +277,23 @@ async function handlePaymentSuccess(paymentNo, thirdPartyNo, paymentMethod) {
       for (const it of items) {
         await query('UPDATE products SET sales = sales + ? WHERE id = ?', [it.quantity, it.product_id]);
       }
-      // 支付成功后为订单分配卡密（若函数存在）
-      if (typeof assignCardCodeToOrder === 'function') {
-        await assignCardCodeToOrder(order.id, order.total_amount);
-      } else {
-        console.warn('assignCardCodeToOrder 未定义，跳过卡密分配');
+      
+      // 确认预分配
+      if (order.reservation_id) {
+        const confirmResult = await confirmReservation(order.reservation_id);
+        if (!confirmResult.success) {
+          console.warn('确认预分配失败:', confirmResult.message);
+        }
+      }
+      
+      // 分配具体卡密
+      for (const item of items) {
+        const assignResult = await assignCardCodes(item.product_id, item.quantity);
+        if (assignResult.success) {
+          console.log(`商品${item.product_id}分配卡密成功:`, assignResult.cardCodes);
+        } else {
+          console.warn(`商品${item.product_id}分配卡密失败:`, assignResult.message);
+        }
       }
 
       // 调用第三方接口通知支付成功

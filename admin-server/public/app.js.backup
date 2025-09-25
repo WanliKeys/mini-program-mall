@@ -964,14 +964,15 @@ function renderProductsTable(products) {
         return;
     }
     
-    const placeholderImg = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xOCAxOEgxOFYzMEgzMFYxOEgxOCIgZmlsbD0iIzlDQTNBRiIvPgo8L3N2Zz4K';
-    tbody.innerHTML = products.map(product => `
+    tbody.innerHTML = products.map(product => {
+        console.log('商品数据:', product.id, product.name, product.price, '卡密库存:', product.card_available_stock);
+        return `
         <tr>
             <td><input type="checkbox" value="${product.id}" class="checkbox"></td>
             <td>${product.id}</td>
             <td>
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <img src="${product.image || placeholderImg}" style="width: 48px; height: 48px; object-fit: cover; border-radius: 8px; border: 1px solid #f0f0f0;" onerror="this.src='${placeholderImg}'">
+                    <img src="${product.image}" style="width: 48px; height: 48px; object-fit: cover; border-radius: 8px; border: 1px solid #f0f0f0;" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xOCAxOEgxOFYzMEgzMFYxOEgxOCIgZmlsbD0iIzlDQTNBRiIvPgo8L3N2Zz4K'">
                     <div>
                         <div style="font-weight: 600; color: #262626; margin-bottom: 4px; font-size: 14px;">${product.name}</div>
                         <div style="color: #8c8c8c; font-size: 12px; line-height: 1.4;">${product.description ? product.description.substring(0, 50) + '...' : '暂无描述'}</div>
@@ -1010,7 +1011,8 @@ function renderProductsTable(products) {
                 </div>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // 为商品编辑弹窗加载分类数据
@@ -1162,7 +1164,8 @@ function renderCategoriesTable(categories) {
                 </div>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // 更新分类筛选下拉框
@@ -1181,7 +1184,8 @@ function updateCategoryFilter(categories) {
                     <i class="bi bi-check"></i>
                     <span>${category.name}</span>
                 </div>
-            `).join('')}
+            `;
+    }).join('')}
         `;
         
         // 重新绑定事件
@@ -1209,7 +1213,8 @@ function updateCategoryFilter(categories) {
                     <i class="bi bi-check"></i>
                     <span>${category.name}</span>
                 </div>
-            `).join('')}
+            `;
+    }).join('')}
         `;
         
         // 重新绑定事件
@@ -1308,7 +1313,8 @@ function renderBannersTable(banners) {
                 </div>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 
     enableBannerRowDrag();
 }
@@ -1488,7 +1494,8 @@ function renderOrdersTable(orders) {
                 <button class="btn btn-sm btn-outline-primary" onclick="viewOrder(${order.id})">查看</button>
                 </td>
             </tr>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // 渲染分页
@@ -2246,7 +2253,8 @@ function updateCardCodesTable() {
                 </div>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
     
     updateCardCodesPagination();
     updateBatchDeleteButton();
