@@ -5,6 +5,20 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { query } = require('../config/database');
 
 /**
+ * 测试API
+ * GET /api/referral/test
+ */
+router.get('/test', (req, res) => {
+  res.json({
+    success: true,
+    message: '测试API正常',
+    data: {
+      test: 'hello world'
+    }
+  });
+});
+
+/**
  * 获取引流商品信息
  * GET /api/referral/product
  */
@@ -37,23 +51,52 @@ router.get('/product', asyncHandler(async (req, res) => {
       return error(res, '商品已下架', 400);
     }
     
-    // 格式化商品信息
+    // 安全处理JSON字段
+    let images = [];
+    let tags = [];
+    
+    if (link.images) {
+      try {
+        if (typeof link.images === 'string') {
+          images = JSON.parse(link.images);
+        } else if (Array.isArray(link.images)) {
+          images = link.images;
+        }
+      } catch (e) {
+        console.warn('解析images失败，使用默认值:', e.message);
+        images = [];
+      }
+    }
+    
+    if (link.tags) {
+      try {
+        if (typeof link.tags === 'string') {
+          tags = JSON.parse(link.tags);
+        } else if (Array.isArray(link.tags)) {
+          tags = link.tags;
+        }
+      } catch (e) {
+        console.warn('解析tags失败，使用默认值:', e.message);
+        tags = [];
+      }
+    }
+    
     const product = {
       id: link.product_id,
-      name: link.name,
-      description: link.description,
-      image: link.image,
-      images: link.images ? JSON.parse(link.images) : [],
-      price: parseFloat(link.price),
+      name: link.name || '商品',
+      description: link.description || '',
+      image: link.image || '',
+      images: images,
+      price: parseFloat(link.price) || 0,
       originalPrice: link.original_price ? parseFloat(link.original_price) : null,
-      stock: link.stock,
-      sales: link.sales,
+      stock: parseInt(link.stock) || 0,
+      sales: parseInt(link.sales) || 0,
       cardPrice: link.card_price ? parseFloat(link.card_price) : null,
-      cardStock: link.card_stock,
-      tags: link.tags ? JSON.parse(link.tags) : [],
+      cardStock: parseInt(link.card_stock) || 0,
+      tags: tags,
       category: {
         id: link.category_id,
-        name: link.category_name
+        name: link.category_name || '默认分类'
       }
     };
     
