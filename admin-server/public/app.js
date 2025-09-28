@@ -1003,6 +1003,10 @@ function renderProductsTable(products) {
                         <i class="bi bi-pencil"></i>
                         <span>编辑</span>
                     </button>
+                    <button class="action-btn info" onclick="generateReferralLink(${product.id})" title="生成引流链接">
+                        <i class="bi bi-link-45deg"></i>
+                        <span>引流链接</span>
+                    </button>
                     <button class="action-btn danger" onclick="deleteProduct(${product.id})" title="删除">
                         <i class="bi bi-trash"></i>
                         <span>删除</span>
@@ -2612,4 +2616,83 @@ async function batchImportCardCodes() {
         console.error('批量导入卡密失败:', error);
         showMessage(error.message || '导入失败', 'error');
     }
+}
+
+// 引流链接相关函数
+let currentReferralProduct = null;
+
+// 生成引流链接
+async function generateReferralLink(productId) {
+    try {
+        // 先获取商品信息
+        const productResponse = await fetch(`${API_BASE}/admin/products/${productId}`, {
+            headers: {
+                'Authorization': `Bearer ${currentToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!productResponse.ok) {
+            throw new Error('获取商品信息失败');
+        }
+        
+        const productData = await productResponse.json();
+        if (!productData.success) {
+            throw new Error(productData.message);
+        }
+        
+        currentReferralProduct = productData.data;
+        
+        // 生成引流链接
+        const response = await fetch(`${API_BASE}/admin/referral-links`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${currentToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ productId: productId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showReferralLinkModal(data.data);
+        } else {
+            throw new Error(data.message || '生成引流链接失败');
+        }
+    } catch (error) {
+        console.error('生成引流链接失败:', error);
+        showMessage(error.message || '生成失败', 'error');
+    }
+}
+
+// 显示引流链接弹窗
+function showReferralLinkModal(data) {
+    const modal = document.getElementById('referral-link-modal');
+    
+    // 填充商品信息
+    document.getElementById('referral-product-name').textContent = currentReferralProduct.name;
+    document.getElementById('referral-product-price').textContent = `¥${currentReferralProduct.price}`;
+    
+    // 填充链接信息
+    document.getElementById('referral-base-url').value = data.baseUrl;
+    document.getElementById('referral-link-code').value = data.linkCode;
+    document.getElementById('referral-full-template').value = data.template;
+    
+    modal.style.display = 'flex';
+}
+
+// 隐藏引流链接弹窗
+function hideReferralLinkModal() {
+    const modal = document.getElementById('referral-link-modal');
+    modal.style.display = 'none';
+    currentReferralProduct = null;
+}
+
+// 复制引流链接模板
+function copyReferralTemplate() {
+    const templateInput = document.getElementById('referral-full-template');
+    templateInput.select();
+    document.execCommand('copy');
+    showMessage('链接模板已复制到剪贴板', 'success');
 }

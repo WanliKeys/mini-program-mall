@@ -8,7 +8,6 @@ const axios = require('axios');
 const moment = require('moment');
 const { confirmReservation, assignCardCodes } = require('../utils/inventory');
 const WeChatPay = require('../utils/wechatPay');
-const AliPay = require('../utils/alipay');
 const { beginTransaction, commit, rollback } = require('../config/database');
 
 // 所有支付接口都需要认证
@@ -91,8 +90,6 @@ router.post('/pay', asyncHandler(async (req, res) => {
         throw err;
       }
       
-    } else if (paymentMethod === 'alipay') {
-      return error(res, '当前小程序不支持支付宝支付', 400);
     } else {
       return error(res, '不支持的支付方式', 400);
     }
@@ -161,40 +158,6 @@ router.post('/callback/wechat', asyncHandler(async (req, res) => {
   }
 }));
 
-/**
- * 支付回调处理 (支付宝)
- * POST /api/payments/callback/alipay
- */
-router.post('/callback/alipay', asyncHandler(async (req, res) => {
-  try {
-    console.log('支付宝支付回调:', req.body);
-    
-    const alipay = new AliPay();
-    
-    // 验证回调签名
-    if (process.env.NODE_ENV === 'production' && !alipay.verifyCallback(req.body)) {
-      console.error('支付宝回调签名验证失败');
-      return res.send('fail');
-    }
-    
-    const { out_trade_no, trade_no, trade_status } = req.body;
-    
-    if (trade_status === 'TRADE_SUCCESS' || trade_status === 'TRADE_FINISHED') {
-      await handlePaymentSuccess(out_trade_no, trade_no, 'alipay');
-      
-      console.log(`支付宝支付成功: ${out_trade_no} -> ${trade_no}`);
-    } else {
-      console.log(`支付宝支付状态: ${trade_status}, 订单: ${out_trade_no}`);
-    }
-    
-    // 返回支付宝要求的格式
-    res.send('success');
-    
-  } catch (err) {
-    console.error('支付宝支付回调处理失败:', err);
-    res.send('fail');
-  }
-}));
 
 /**
  * 查询支付状态
@@ -298,6 +261,9 @@ async function handlePaymentSuccess(paymentNo, thirdPartyNo, paymentMethod) {
 
       // 调用第三方接口通知支付成功
       await notifyThirdParty(order, payment);
+      
+      // 通知引流方
+      await notifyReferralPartner(order, payment);
     }
     
     console.log(`支付成功处理完成: ${paymentNo}`);
@@ -342,6 +308,61 @@ async function notifyThirdParty(order, payment) {
   } catch (err) {
     console.error('通知第三方失败:', err.message);
     // 通知失败不影响主流程，只记录日志
+  }
+}
+
+// 辅助函数：通知引流方
+async function notifyReferralPartner(order, payment) {
+  try {
+    // 检查是否是引流订单
+    const referralOrders = await query(
+      `SELECT ro.*, rl.link_code 
+       FROM referral_orders ro 
+       JOIN referral_links rl ON ro.referral_link_id = rl.id 
+       WHERE ro.our_order_id = ?`,
+      [order.id]
+    );
+    
+    if (referralOrders.length === 0) {
+      console.log('非引流订单，跳过引流方通知');
+      return;
+    }
+    
+    const referralOrder = referralOrders[0];
+    
+    const notifyData = {
+      orderNo: referralOrder.partner_order_no,
+      amount: parseFloat(order.total_amount),
+      status: 'paid'
+    };
+    
+    console.log('通知引流方:', referralOrder.notify_url, notifyData);
+    
+    const response = await axios.post(referralOrder.notify_url, notifyData, {
+      timeout: 10000,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    // 更新引流订单状态
+    await query(
+      'UPDATE referral_orders SET status = ?, updated_at = NOW() WHERE id = ?',
+      ['paid', referralOrder.id]
+    );
+    
+    console.log('引流方通知成功:', response.data);
+    
+  } catch (error) {
+    console.error('通知引流方失败:', error.message);
+    
+    // 更新为失败状态
+    if (referralOrders && referralOrders.length > 0) {
+      await query(
+        'UPDATE referral_orders SET status = ?, updated_at = NOW() WHERE id = ?',
+        ['failed', referralOrders[0].id]
+      );
+    }
   }
 }
 

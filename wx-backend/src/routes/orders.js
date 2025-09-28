@@ -137,7 +137,7 @@ router.get('/', asyncHandler(async (req, res) => {
 router.post('/', asyncHandler(async (req, res) => {
   try {
     const userId = req.user.id;
-    const { productId, quantity = 1, addressId, externalOrderNo, remark, paymentMethod = 'wechat' } = req.body;
+    const { productId, quantity = 1, addressId, externalOrderNo, remark, paymentMethod = 'wechat', isReferral, linkCode, partnerOrderNo, notifyUrl } = req.body;
     
     // 验证参数
     if (!productId || !addressId) {
@@ -239,6 +239,32 @@ router.post('/', asyncHandler(async (req, res) => {
         ) VALUES (?, ?, 'external', ?, 'order', NOW())`,
         [userId, externalOrderNo, productId]
       );
+    }
+    
+    // 如果是引流订单，关联引流订单记录
+    if (isReferral && linkCode && partnerOrderNo && notifyUrl) {
+      try {
+        // 获取引流链接ID
+        const referralLinks = await query(
+          'SELECT id FROM referral_links WHERE link_code = ?',
+          [linkCode]
+        );
+        
+        if (referralLinks.length > 0) {
+          const referralLinkId = referralLinks[0].id;
+          
+          // 更新引流订单记录，关联我们的订单ID
+          await query(
+            'UPDATE referral_orders SET our_order_id = ?, updated_at = NOW() WHERE referral_link_id = ? AND partner_order_no = ?',
+            [orderId, referralLinkId, partnerOrderNo]
+          );
+          
+          console.log(`引流订单关联成功: ${partnerOrderNo} -> ${orderId}`);
+        }
+      } catch (err) {
+        console.error('关联引流订单失败:', err);
+        // 不影响主流程，只记录日志
+      }
     }
     
     const orderData = {

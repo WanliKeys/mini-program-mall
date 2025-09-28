@@ -192,6 +192,38 @@ CREATE TABLE IF NOT EXISTS product_reservations (
   INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品预分配表';
 
+-- 引流链接表
+CREATE TABLE IF NOT EXISTS referral_links (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  product_id INT NOT NULL COMMENT '商品ID',
+  link_code VARCHAR(50) UNIQUE NOT NULL COMMENT '链接码',
+  status ENUM('active', 'inactive') DEFAULT 'active' COMMENT '状态',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  INDEX idx_product (product_id),
+  INDEX idx_link_code (link_code),
+  INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='引流链接表';
+
+-- 引流订单表
+CREATE TABLE IF NOT EXISTS referral_orders (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  referral_link_id INT NOT NULL COMMENT '引流链接ID',
+  partner_order_no VARCHAR(100) NOT NULL COMMENT '引流方订单号',
+  notify_url VARCHAR(500) NOT NULL COMMENT '通知地址',
+  our_order_id INT DEFAULT NULL COMMENT '我们的订单ID',
+  status ENUM('pending', 'paid', 'failed') DEFAULT 'pending' COMMENT '状态',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (referral_link_id) REFERENCES referral_links(id) ON DELETE CASCADE,
+  FOREIGN KEY (our_order_id) REFERENCES orders(id) ON DELETE SET NULL,
+  INDEX idx_referral_link (referral_link_id),
+  INDEX idx_partner_order (partner_order_no),
+  INDEX idx_our_order (our_order_id),
+  INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='引流订单表';
+
 -- 插入初始数据
 -- 商品分类
 INSERT INTO categories (name, icon, sort_order) VALUES

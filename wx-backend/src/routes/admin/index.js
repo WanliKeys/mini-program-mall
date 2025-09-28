@@ -10,6 +10,10 @@ const router = express.Router();
 const cardCodesRouter = require('./cardCodes');
 router.use('/card-codes', cardCodesRouter);
 
+// 引入引流链接管理路由
+const referralLinksRouter = require('./referralLinks');
+router.use('/referral-links', referralLinksRouter);
+
 // 管理员登录（简单用户名密码，需配合 users 表）
 router.post('/login', asyncHandler(async (req, res) => {
   const { username, password } = req.body || {};

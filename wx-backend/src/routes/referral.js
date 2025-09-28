@@ -1,284 +1,122 @@
 const express = require('express');
 const router = express.Router();
 const { success, error } = require('../utils/response');
-const { authenticate } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { query } = require('../config/database');
-const moment = require('moment');
 
 /**
- * 记录引流访问
- * POST /api/referral/track
+ * 获取引流商品信息
+ * GET /api/referral/product
  */
-router.post('/track', authenticate, asyncHandler(async (req, res) => {
+router.get('/product', asyncHandler(async (req, res) => {
   try {
-    const userId = req.user.id;
-    const { externalOrderNo, productId, action = 'visit', extra = {} } = req.body;
+    const { linkCode } = req.query;
     
-    if (!externalOrderNo || !productId) {
-      return error(res, '外部订单号和商品ID不能为空', 400);
+    if (!linkCode) {
+      return error(res, '链接码不能为空', 400);
     }
     
-    // 验证商品是否存在
-    const products = await query(
-      'SELECT id, name FROM products WHERE id = ? AND status = 1',
-      [productId]
+    // 获取引流链接信息
+    const links = await query(
+      `SELECT rl.*, p.*, c.name as category_name
+       FROM referral_links rl
+       JOIN products p ON rl.product_id = p.id
+       JOIN categories c ON p.category_id = c.id
+       WHERE rl.link_code = ? AND rl.status = 'active'`,
+      [linkCode]
     );
     
-    if (products.length === 0) {
-      return error(res, '商品不存在或已下架', 404);
+    if (links.length === 0) {
+      return error(res, '引流链接不存在或已失效', 404);
     }
     
-    // 记录引流日志
-    await query(
-      `INSERT INTO referral_logs (
-        external_order_no, user_id, product_id, action, extra_data, created_at
-      ) VALUES (?, ?, ?, ?, ?, NOW())`,
-      [externalOrderNo, userId, productId, action, JSON.stringify(extra)]
-    );
+    const link = links[0];
     
-    success(res, null, '引流记录成功');
-    
-  } catch (err) {
-    console.error('记录引流失败:', err);
-    error(res, '记录引流失败', 500, err.message);
-  }
-}));
-
-/**
- * 获取引流统计
- * GET /api/referral/stats
- */
-router.get('/stats', asyncHandler(async (req, res) => {
-  try {
-    const { startDate, endDate, externalOrderNo } = req.query;
-    
-    let whereClause = 'WHERE 1=1';
-    const params = [];
-    
-    if (startDate) {
-      whereClause += ' AND DATE(created_at) >= ?';
-      params.push(startDate);
+    // 检查商品状态
+    if (link.status !== 1) {
+      return error(res, '商品已下架', 400);
     }
     
-    if (endDate) {
-      whereClause += ' AND DATE(created_at) <= ?';
-      params.push(endDate);
-    }
-    
-    if (externalOrderNo) {
-      whereClause += ' AND external_order_no = ?';
-      params.push(externalOrderNo);
-    }
-    
-    // 总访问量
-    const visitStats = await query(
-      `SELECT COUNT(*) as total_visits FROM referral_logs ${whereClause} AND action = 'visit'`,
-      params
-    );
-    
-    // 购买转化
-    const purchaseStats = await query(
-      `SELECT COUNT(*) as total_purchases FROM referral_logs ${whereClause} AND action = 'purchase'`,
-      params
-    );
-    
-    // 按产品统计
-    const productStats = await query(
-      `SELECT 
-        product_id,
-        COUNT(CASE WHEN action = 'visit' THEN 1 END) as visits,
-        COUNT(CASE WHEN action = 'purchase' THEN 1 END) as purchases,
-        COUNT(CASE WHEN action = 'purchase' THEN 1 END) * 100.0 / 
-        NULLIF(COUNT(CASE WHEN action = 'visit' THEN 1 END), 0) as conversion_rate
-       FROM referral_logs ${whereClause}
-       GROUP BY product_id
-       ORDER BY visits DESC`,
-      params
-    );
-    
-    // 按日期统计
-    const dailyStats = await query(
-      `SELECT 
-        DATE(created_at) as date,
-        COUNT(CASE WHEN action = 'visit' THEN 1 END) as visits,
-        COUNT(CASE WHEN action = 'purchase' THEN 1 END) as purchases
-       FROM referral_logs ${whereClause}
-       GROUP BY DATE(created_at)
-       ORDER BY date DESC
-       LIMIT 30`,
-      params
-    );
-    
-    const stats = {
-      summary: {
-        totalVisits: visitStats[0].total_visits,
-        totalPurchases: purchaseStats[0].total_purchases,
-        conversionRate: visitStats[0].total_visits > 0 
-          ? (purchaseStats[0].total_purchases * 100 / visitStats[0].total_visits).toFixed(2)
-          : '0.00'
-      },
-      productStats,
-      dailyStats
+    // 格式化商品信息
+    const product = {
+      id: link.product_id,
+      name: link.name,
+      description: link.description,
+      image: link.image,
+      images: link.images ? JSON.parse(link.images) : [],
+      price: parseFloat(link.price),
+      originalPrice: link.original_price ? parseFloat(link.original_price) : null,
+      stock: link.stock,
+      sales: link.sales,
+      cardPrice: link.card_price ? parseFloat(link.card_price) : null,
+      cardStock: link.card_stock,
+      tags: link.tags ? JSON.parse(link.tags) : [],
+      category: {
+        id: link.category_id,
+        name: link.category_name
+      }
     };
     
-    success(res, stats, '获取引流统计成功');
+    success(res, {
+      product,
+      linkCode
+    }, '获取引流商品信息成功');
     
   } catch (err) {
-    console.error('获取引流统计失败:', err);
-    error(res, '获取引流统计失败', 500, err.message);
+    console.error('获取引流商品信息失败:', err);
+    error(res, '获取引流商品信息失败', 500, err.message);
   }
 }));
 
 /**
- * 获取引流日志
- * GET /api/referral/logs
+ * 创建引流订单
+ * POST /api/referral/order
  */
-router.get('/logs', asyncHandler(async (req, res) => {
+router.post('/order', asyncHandler(async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      pageSize = 20,
-      externalOrderNo,
-      productId,
-      action,
-      startDate,
-      endDate
-    } = req.query;
+    const { linkCode, partnerOrderNo, notifyUrl } = req.body;
     
-    let whereClause = 'WHERE 1=1';
-    const params = [];
-    
-    if (externalOrderNo) {
-      whereClause += ' AND rl.external_order_no = ?';
-      params.push(externalOrderNo);
+    if (!linkCode || !partnerOrderNo || !notifyUrl) {
+      return error(res, '参数不完整', 400);
     }
     
-    if (productId) {
-      whereClause += ' AND rl.product_id = ?';
-      params.push(productId);
-    }
-    
-    if (action) {
-      whereClause += ' AND rl.action = ?';
-      params.push(action);
-    }
-    
-    if (startDate) {
-      whereClause += ' AND DATE(rl.created_at) >= ?';
-      params.push(startDate);
-    }
-    
-    if (endDate) {
-      whereClause += ' AND DATE(rl.created_at) <= ?';
-      params.push(endDate);
-    }
-    
-    const offset = (page - 1) * pageSize;
-    
-    // 获取日志列表
-    const logs = await query(
-      `SELECT 
-        rl.*,
-        p.name as product_name,
-        p.image as product_image,
-        u.nickname as user_nickname
-       FROM referral_logs rl
-       LEFT JOIN products p ON rl.product_id = p.id
-       LEFT JOIN users u ON rl.user_id = u.id
-       ${whereClause}
-       ORDER BY rl.created_at DESC
-       LIMIT ? OFFSET ?`,
-      [...params, parseInt(pageSize), offset]
+    // 验证引流链接
+    const links = await query(
+      'SELECT * FROM referral_links WHERE link_code = ? AND status = "active"',
+      [linkCode]
     );
     
-    // 获取总数
-    const countResult = await query(
-      `SELECT COUNT(*) as total FROM referral_logs rl ${whereClause}`,
-      params
+    if (links.length === 0) {
+      return error(res, '引流链接不存在或已失效', 404);
+    }
+    
+    const link = links[0];
+    
+    // 检查是否已存在相同的引流方订单号
+    const existingOrders = await query(
+      'SELECT * FROM referral_orders WHERE partner_order_no = ?',
+      [partnerOrderNo]
     );
     
-    // 处理数据
-    const processedLogs = logs.map(log => ({
-      ...log,
-      extra_data: log.extra_data ? JSON.parse(log.extra_data) : null
-    }));
+    if (existingOrders.length > 0) {
+      return error(res, '引流方订单号已存在', 400);
+    }
+    
+    // 创建引流订单记录
+    await query(
+      'INSERT INTO referral_orders (referral_link_id, partner_order_no, notify_url) VALUES (?, ?, ?)',
+      [link.id, partnerOrderNo, notifyUrl]
+    );
     
     success(res, {
-      logs: processedLogs,
-      total: countResult[0].total,
-      hasMore: offset + logs.length < countResult[0].total,
-      pagination: {
-        page: parseInt(page),
-        pageSize: parseInt(pageSize),
-        total: countResult[0].total,
-        totalPages: Math.ceil(countResult[0].total / pageSize)
-      }
-    }, '获取引流日志成功');
+      linkCode,
+      partnerOrderNo,
+      notifyUrl
+    }, '引流订单创建成功');
     
   } catch (err) {
-    console.error('获取引流日志失败:', err);
-    error(res, '获取引流日志失败', 500, err.message);
-  }
-}));
-
-/**
- * 获取订单引流信息
- * GET /api/referral/order/:orderNo
- */
-router.get('/order/:orderNo', asyncHandler(async (req, res) => {
-  try {
-    const orderNo = req.params.orderNo;
-    
-    // 获取订单信息
-    const orders = await query(
-      'SELECT * FROM orders WHERE order_no = ?',
-      [orderNo]
-    );
-    
-    if (orders.length === 0) {
-      return error(res, '订单不存在', 404);
-    }
-    
-    const order = orders[0];
-    
-    if (order.source !== 'referral') {
-      return error(res, '该订单不是引流订单', 400);
-    }
-    
-    // 获取引流日志
-    const logs = await query(
-      `SELECT 
-        rl.*,
-        p.name as product_name,
-        p.image as product_image
-       FROM referral_logs rl
-       LEFT JOIN products p ON rl.product_id = p.id
-       WHERE rl.external_order_no = ?
-       ORDER BY rl.created_at ASC`,
-      [orderNo]
-    );
-    
-    // 处理数据
-    const processedLogs = logs.map(log => ({
-      ...log,
-      extra_data: log.extra_data ? JSON.parse(log.extra_data) : null
-    }));
-    
-    success(res, {
-      order: {
-        orderNo: order.order_no,
-        totalAmount: parseFloat(order.total_amount),
-        status: order.status,
-        source: order.source,
-        createdAt: order.created_at
-      },
-      referralLogs: processedLogs
-    }, '获取订单引流信息成功');
-    
-  } catch (err) {
-    console.error('获取订单引流信息失败:', err);
-    error(res, '获取订单引流信息失败', 500, err.message);
+    console.error('创建引流订单失败:', err);
+    error(res, '创建引流订单失败', 500, err.message);
   }
 }));
 

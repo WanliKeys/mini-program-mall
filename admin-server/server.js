@@ -237,6 +237,12 @@ app.post('/api/admin/card-codes', (req, res) => proxyRequest(req, res, '/admin/c
 app.post('/api/admin/card-codes/batch', (req, res) => proxyRequest(req, res, '/admin/card-codes/batch', 'POST', req.body));
 app.put('/api/admin/card-codes/:id', (req, res) => proxyRequest(req, res, `/admin/card-codes/${req.params.id}`, 'PUT', req.body));
 app.delete('/api/admin/card-codes/:id', (req, res) => proxyRequest(req, res, `/admin/card-codes/${req.params.id}`, 'DELETE'));
+
+// 引流链接管理路由
+app.get('/api/admin/referral-links/product/:productId', (req, res) => proxyRequest(req, res, `/admin/referral-links/product/${req.params.productId}`));
+app.post('/api/admin/referral-links', (req, res) => proxyRequest(req, res, '/admin/referral-links', 'POST', req.body));
+app.put('/api/admin/referral-links/:id/status', (req, res) => proxyRequest(req, res, `/admin/referral-links/${req.params.id}/status`, 'PUT', req.body));
+app.delete('/api/admin/referral-links/:id', (req, res) => proxyRequest(req, res, `/admin/referral-links/${req.params.id}`, 'DELETE'));
 app.delete('/api/admin/card-codes/batch', (req, res) => {
   console.log('批量删除请求体:', req.body);
   console.log('请求头:', req.headers);
