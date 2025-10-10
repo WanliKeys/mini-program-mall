@@ -10,8 +10,14 @@ const { confirmReservation, assignCardCodes } = require('../utils/inventory');
 const WeChatPay = require('../utils/wechatPay');
 const { beginTransaction, commit, rollback } = require('../config/database');
 
-// 所有支付接口都需要认证
-router.use(authenticate);
+// 所有支付接口都需要认证（除了回调接口）
+router.use((req, res, next) => {
+  // 回调接口不需要认证
+  if (req.path.includes('/callback/')) {
+    return next();
+  }
+  return authenticate(req, res, next);
+});
 
 /**
  * 发起支付
@@ -108,47 +114,100 @@ router.post('/pay', asyncHandler(async (req, res) => {
  */
 router.post('/callback/wechat', asyncHandler(async (req, res) => {
   try {
-    console.log('微信支付回调:', req.headers, req.body);
-    
+    console.log('微信支付回调:', {
+      headers: {
+        'wechatpay-timestamp': req.headers['wechatpay-timestamp'],
+        'wechatpay-nonce': req.headers['wechatpay-nonce'],
+        'wechatpay-serial': req.headers['wechatpay-serial'],
+        'wechatpay-signature': req.headers['wechatpay-signature'] ? '[已隐藏]' : 'missing'
+      },
+      body: req.body
+    });
+
     const wechatPay = new WeChatPay();
-    
-    // 验证回调签名
-    if (process.env.NODE_ENV === 'production' && !wechatPay.verifyCallbackSignature(req.headers, req.body)) {
+
+    // 验证回调签名 (生产环境和开发环境都需要验证)
+    if (!(await wechatPay.verifyCallbackSignature(req.headers, req.body))) {
       console.error('微信支付回调签名验证失败');
       return res.status(400).json({
         code: 'FAIL',
         message: '签名验证失败'
       });
     }
-    
+
+    console.log('微信支付回调签名验证成功');
+
     // 解密回调数据
     const { resource } = req.body;
     let callbackData;
-    
+
     if (resource && resource.ciphertext) {
-      // 生产环境：解密数据
+      // 正式环境：解密数据
       callbackData = wechatPay.decryptCallbackData(resource);
+      console.log('微信支付回调数据解密成功:', {
+        out_trade_no: callbackData.out_trade_no,
+        transaction_id: callbackData.transaction_id,
+        trade_state: callbackData.trade_state,
+        amount: callbackData.amount
+      });
     } else {
-      // 开发环境：直接使用请求体数据
+      // 开发环境或测试环境：直接使用请求体数据
       callbackData = req.body;
+      console.log('使用开发环境回调数据:', callbackData);
     }
-    
-    const { out_trade_no, transaction_id, trade_state } = callbackData;
-    
+
+    const { out_trade_no, transaction_id, trade_state, amount } = callbackData;
+
+    if (!out_trade_no) {
+      console.error('微信支付回调缺少订单号');
+      return res.status(400).json({
+        code: 'FAIL',
+        message: '缺少订单号'
+      });
+    }
+
     if (trade_state === 'SUCCESS') {
+      // 验证金额是否匹配
+      const paymentRecords = await query(
+        'SELECT * FROM payments WHERE payment_no = ?',
+        [out_trade_no]
+      );
+
+      if (paymentRecords.length === 0) {
+        console.error('支付记录不存在:', out_trade_no);
+        return res.status(400).json({
+          code: 'FAIL',
+          message: '支付记录不存在'
+        });
+      }
+
+      const paymentRecord = paymentRecords[0];
+      const expectedAmount = Math.floor(parseFloat(paymentRecord.amount) * 100); // 转换为分
+
+      if (amount && amount.total !== expectedAmount) {
+        console.error('支付金额不匹配:', {
+          expected: expectedAmount,
+          actual: amount.total,
+          paymentNo: out_trade_no
+        });
+        return res.status(400).json({
+          code: 'FAIL',
+          message: '支付金额不匹配'
+        });
+      }
+
       await handlePaymentSuccess(out_trade_no, transaction_id, 'wechat');
-      
-      console.log(`微信支付成功: ${out_trade_no} -> ${transaction_id}`);
+      console.log(`微信支付成功处理完成: ${out_trade_no} -> ${transaction_id}`);
     } else {
       console.log(`微信支付状态: ${trade_state}, 订单: ${out_trade_no}`);
     }
-    
+
     // 返回微信要求的格式
     res.status(200).json({
       code: 'SUCCESS',
       message: '成功'
     });
-    
+
   } catch (err) {
     console.error('微信支付回调处理失败:', err);
     res.status(500).json({
