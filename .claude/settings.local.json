@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude config:*)",
+      "Bash(printenv:*)",
+      "Read(//Users/liwanli/.config/**)",
+      "WebSearch",
+      "Bash(npm test)",
+      "Bash(node:*)",
+      "Bash(timeout:*)",
+      "WebFetch(domain:developers.weixin.qq.com)",
+      "Bash(curl:*)",
+      "Bash(nslookup:*)",
+      "Bash(ping:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(lsof:*)",
+      "Bash(npm start:*)",
+      "Bash(chmod:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

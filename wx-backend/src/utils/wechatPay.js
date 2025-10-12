@@ -12,7 +12,7 @@ class WeChatPay {
     this.mchId = process.env.WECHAT_PAY_MCHID;
     this.privateKeyPath = process.env.WECHAT_PAY_PRIVATE_KEY_PATH;
     this.certSerialNo = process.env.WECHAT_PAY_CERT_SERIAL_NO;
-    this.apiV3Key = process.env.WECHAT_PAY_APIV3_KEY;
+    this.apiV3Key = (process.env.WECHAT_PAY_APIV3_KEY || '').trim();
     this.notifyUrl = process.env.WECHAT_PAY_NOTIFY_URL;
 
     this.baseURL = 'https://api.mch.weixin.qq.com';
@@ -24,6 +24,15 @@ class WeChatPay {
     } else {
       console.error('微信支付私钥文件不存在:', this.privateKeyPath);
       throw new Error('微信支付私钥文件不存在');
+    }
+
+    // 校验 APIv3 密钥
+    if (!this.apiV3Key || this.apiV3Key.length !== 32) {
+      console.error('APIv3 密钥无效: 长度应为32个字符', {
+        configured: !!this.apiV3Key,
+        length: this.apiV3Key ? this.apiV3Key.length : 0
+      });
+      throw new Error('微信支付 APIv3 密钥配置不正确（需要32位）');
     }
   }
 
@@ -48,18 +57,38 @@ class WeChatPay {
 
       const { data } = response.data;
 
+      console.log('🔍 获取到的证书数据:', {
+        certificateCount: data.length,
+        firstCertSerialNo: data[0]?.serial_no,
+        firstCertEncryptInfo: data[0]?.encrypt_certificate ? {
+          algorithm: data[0].encrypt_certificate.algorithm,
+          ciphertextLength: data[0].encrypt_certificate.ciphertext?.length,
+          nonceLength: data[0].encrypt_certificate.nonce?.length,
+          associatedDataLength: data[0].encrypt_certificate.associated_data?.length
+        } : null
+      });
+
       // 解密证书
       for (const cert of data) {
+        console.log(`🔐 开始解密证书: ${cert.serial_no}`);
         const decryptedCert = this.decryptCertificate(cert.encrypt_certificate);
         if (decryptedCert) {
           this.platformCertificates.set(cert.serial_no, decryptedCert);
+          console.log(`✅ 证书解密成功: ${cert.serial_no.substring(0, 10)}***`);
+        } else {
+          console.log(`❌ 证书解密失败: ${cert.serial_no.substring(0, 10)}***`);
         }
       }
 
       return this.platformCertificates;
 
     } catch (error) {
-      console.error('获取平台证书失败:', error.response?.data || error.message);
+      console.error('获取平台证书失败:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        stack: error.stack
+      });
       throw new Error('获取平台证书失败');
     }
   }
@@ -76,10 +105,22 @@ class WeChatPay {
       }
 
       const key = Buffer.from(this.apiV3Key, 'utf8');
-      const iv = Buffer.from(nonce, 'base64');
+      const iv = Buffer.from(nonce, 'utf8');
       const encrypted = Buffer.from(ciphertext, 'base64');
+
+      // AES-256-GCM 的认证标签是最后 16 个字节
       const authTag = encrypted.slice(-16);
       const data = encrypted.slice(0, -16);
+
+      console.log('🔍 平台证书解密调试:', {
+        algorithm,
+        ciphertextLength: ciphertext.length,
+        nonceLength: nonce.length,
+        associatedDataLength: associated_data?.length || 0,
+        encryptedDataLength: encrypted.length,
+        authTagLength: authTag.length,
+        dataLength: data.length
+      });
 
       const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
       decipher.setAuthTag(authTag);
@@ -91,10 +132,15 @@ class WeChatPay {
       let decrypted = decipher.update(data, null, 'utf8');
       decrypted += decipher.final('utf8');
 
+      console.log('✅ 平台证书解密成功');
       return decrypted;
 
     } catch (error) {
-      console.error('平台证书解密失败:', error);
+      console.error('平台证书解密失败:', {
+        error: error.message,
+        code: error.code,
+        stack: error.stack
+      });
       return null;
     }
   }
@@ -283,42 +329,114 @@ class WeChatPay {
    * 验证支付回调签名
    */
   async verifyCallbackSignature(headers, body) {
+    const verifyStart = Date.now();
+
     try {
+      console.log('🔐 开始验证微信支付回调签名...');
+
       const signature = headers['wechatpay-signature'];
       const timestamp = headers['wechatpay-timestamp'];
       const nonce = headers['wechatpay-nonce'];
       const serial = headers['wechatpay-serial'];
 
-      if (!signature || !timestamp || !nonce || !serial) {
-        console.error('微信支付回调缺少必要的签名信息');
+      // 检查必要的签名信息
+      const missingFields = [];
+      if (!signature) missingFields.push('signature');
+      if (!timestamp) missingFields.push('timestamp');
+      if (!nonce) missingFields.push('nonce');
+      if (!serial) missingFields.push('serial');
+
+      if (missingFields.length > 0) {
+        console.error('❌ 微信支付回调缺少必要的签名信息:', {
+          missingFields,
+          receivedHeaders: Object.keys(headers).filter(key => key.startsWith('wechatpay-'))
+        });
         return false;
       }
+
+      console.log('✅ 签名信息检查通过:', {
+        serial: serial.substring(0, 10) + '***',
+        timestamp: timestamp,
+        nonce: nonce.substring(0, 6) + '***'
+      });
 
       // 验证时间戳（防重放攻击）
       const now = Math.floor(Date.now() / 1000);
-      if (Math.abs(now - parseInt(timestamp)) > 300) { // 5分钟内有效
-        console.error('微信支付回调时间戳过期');
+      const timestampNum = parseInt(timestamp);
+      const timeDiff = Math.abs(now - timestampNum);
+
+      if (timeDiff > 300) { // 5分钟内有效
+        console.error('❌ 微信支付回调时间戳过期:', {
+          receivedTime: new Date(timestampNum * 1000).toISOString(),
+          currentTime: new Date(now * 1000).toISOString(),
+          timeDifference: timeDiff + ' seconds',
+          maxAllowed: 300 + ' seconds'
+        });
         return false;
       }
 
+      console.log('✅ 时间戳验证通过:', {
+        timeDifference: timeDiff + ' seconds',
+        withinTolerance: true
+      });
+
       // 确保已获取平台证书
       if (this.platformCertificates.size === 0) {
-        await this.getPlatformCertificates();
+        console.log('📥 首次获取平台证书...');
+        const certStart = Date.now();
+
+        try {
+          await this.getPlatformCertificates();
+          console.log('✅ 平台证书获取成功:', {
+            certificateCount: this.platformCertificates.size,
+            duration: Date.now() - certStart + 'ms'
+          });
+        } catch (certError) {
+          console.error('❌ 平台证书获取失败:', {
+            error: certError.message,
+            duration: Date.now() - certStart + 'ms'
+          });
+          return false;
+        }
       }
 
       // 使用平台证书验证签名
       const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
+      console.log('🔍 开始签名验证:', {
+        bodyLength: bodyString.length,
+        certificateSerial: serial.substring(0, 10) + '***'
+      });
+
+      const signVerifyStart = Date.now();
       const isValid = this.verifySignature(timestamp, nonce, bodyString, signature, serial);
+      const signVerifyDuration = Date.now() - signVerifyStart;
+
+      console.log(isValid ? '✅' : '❌', '签名验证结果:', {
+        isValid: isValid,
+        duration: signVerifyDuration + 'ms',
+        totalDuration: Date.now() - verifyStart + 'ms'
+      });
 
       if (!isValid) {
-        console.error('微信支付回调签名验证失败');
+        console.error('❌ 微信支付回调签名验证失败:', {
+          timestamp,
+          nonce,
+          serial: serial.substring(0, 10) + '***',
+          bodyHash: crypto.createHash('md5').update(bodyString).digest('hex').substring(0, 8) + '***',
+          signatureLength: signature.length
+        });
         return false;
       }
 
+      console.log('✅ 微信支付回调签名验证完全通过');
       return true;
 
     } catch (error) {
-      console.error('微信支付回调签名验证失败:', error);
+      console.error('❌ 微信支付回调签名验证异常:', {
+        error: error.message,
+        stack: error.stack.split('\n')[0], // 只显示第一行堆栈
+        duration: Date.now() - verifyStart + 'ms'
+      });
       return false;
     }
   }
@@ -335,25 +453,46 @@ class WeChatPay {
       }
       
       const key = Buffer.from(this.apiV3Key, 'utf8');
-      const iv = Buffer.from(nonce, 'base64');
       const encrypted = Buffer.from(ciphertext, 'base64');
       const authTag = encrypted.slice(-16);
       const data = encrypted.slice(0, -16);
-      
-      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-      decipher.setAuthTag(authTag);
-      
-      if (associated_data) {
-        decipher.setAAD(Buffer.from(associated_data, 'utf8'));
+
+      const tryDecrypt = (ivBuffer) => {
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, ivBuffer);
+        decipher.setAuthTag(authTag);
+        if (associated_data) {
+          decipher.setAAD(Buffer.from(associated_data, 'utf8'));
+        }
+        let decrypted = decipher.update(data, null, 'utf8');
+        decrypted += decipher.final('utf8');
+        return decrypted;
+      };
+
+      let plaintext;
+      try {
+        // 首选：nonce 为明文 UTF-8（官方文档）
+        plaintext = tryDecrypt(Buffer.from(nonce, 'utf8'));
+      } catch (primaryErr) {
+        // 兜底：个别上游/代理可能把 nonce 以 base64 形式转发
+        try {
+          plaintext = tryDecrypt(Buffer.from(nonce, 'base64'));
+          console.warn('⚠️ 使用 base64 IV 兼容路径解密成功（请确认上游未改写 nonce 编码）');
+        } catch (fallbackErr) {
+          throw primaryErr; // 仍以首错抛出，保持错误定位
+        }
       }
-      
-      let decrypted = decipher.update(data, null, 'utf8');
-      decrypted += decipher.final('utf8');
-      
-      return JSON.parse(decrypted);
+
+      return JSON.parse(plaintext);
       
     } catch (error) {
-      console.error('微信支付回调数据解密失败:', error);
+      console.error('微信支付回调数据解密失败:', {
+        message: error.message,
+        code: error.code,
+        algorithm: encryptedData?.algorithm,
+        ciphertextLength: encryptedData?.ciphertext?.length || 0,
+        nonceLength: encryptedData?.nonce?.length || 0,
+        associatedDataLength: encryptedData?.associated_data?.length || 0
+      });
       throw error;
     }
   }
