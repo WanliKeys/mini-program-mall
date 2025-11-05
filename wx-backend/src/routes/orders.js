@@ -143,19 +143,19 @@ router.post('/', asyncHandler(async (req, res) => {
     if (!productId || !addressId) {
       return error(res, '商品ID和收货地址不能为空', 400);
     }
-    
+
     // 获取商品信息
     const products = await query(
       'SELECT * FROM products WHERE id = ? AND status = 1',
       [productId]
     );
-    
+
     if (products.length === 0) {
       return error(res, '商品不存在或已下架', 404);
     }
-    
+
     const product = products[0];
-    
+
     // 检查可售库存（考虑卡密库存）
     const availableStock = await getAvailableStock(productId);
     if (availableStock < quantity) {
@@ -168,17 +168,20 @@ router.post('/', asyncHandler(async (req, res) => {
       return error(res, reservation.message, 400);
     }
     
-    // 获取地址信息
-    const addresses = await query(
-      'SELECT * FROM addresses WHERE id = ? AND user_id = ?',
-      [addressId, userId]
-    );
-    
-    if (addresses.length === 0) {
-      return error(res, '收货地址不存在', 404);
+    // 获取地址信息（仅在有地址时获取）
+    let address = null;
+    if (addressId) {
+      const addresses = await query(
+        'SELECT * FROM addresses WHERE id = ? AND user_id = ?',
+        [addressId, userId]
+      );
+
+      if (addresses.length === 0) {
+        return error(res, '收货地址不存在', 404);
+      }
+
+      address = addresses[0];
     }
-    
-    const address = addresses[0];
     
     // 生成订单号
     let orderNo;
@@ -307,17 +310,17 @@ router.post('/batch', asyncHandler(async (req, res) => {
     if (!items || items.length === 0 || !addressId) {
       return error(res, '购物车商品和收货地址不能为空', 400);
     }
-    
+
     // 获取地址信息
     const addresses = await query(
       'SELECT * FROM addresses WHERE id = ? AND user_id = ?',
       [addressId, userId]
     );
-    
+
     if (addresses.length === 0) {
       return error(res, '收货地址不存在', 404);
     }
-    
+
     const address = addresses[0];
     
     // 生成订单号
