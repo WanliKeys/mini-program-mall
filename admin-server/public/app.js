@@ -2075,10 +2075,12 @@ function closeChangePasswordModal() {
     const m = document.getElementById('password-modal');
     if (m) m.style.display = 'none';
 }
-function changePassword() {
+async function changePassword() {
     const oldPwd = document.getElementById('old-password').value;
     const newPwd = document.getElementById('new-password').value;
     const confirmPwd = document.getElementById('confirm-password').value;
+
+    // 前端表单验证
     if (!oldPwd || !newPwd) {
         showMessage('请输入完整信息', 'error');
         return;
@@ -2087,9 +2089,56 @@ function changePassword() {
         showMessage('两次输入的密码不一致', 'error');
         return;
     }
-    // TODO: 调用后端修改密码，这里直接提示成功
-    showMessage('密码修改成功', 'success');
-    closeChangePasswordModal();
+    if (newPwd.length < 6) {
+        showMessage('新密码长度至少6位', 'error');
+        return;
+    }
+
+    // 获取提交按钮并添加加载状态
+    const submitBtn = document.querySelector('#password-modal .btn-primary');
+    if (!submitBtn) {
+        showMessage('找不到提交按钮', 'error');
+        return;
+    }
+
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>修改中...';
+    submitBtn.disabled = true;
+
+    try {
+        // 调用后端API
+        const response = await fetch(`${API_BASE}/admin/change-password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentToken}`
+            },
+            body: JSON.stringify({
+                oldPassword: oldPwd,
+                newPassword: newPwd
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showMessage('密码修改成功', 'success');
+            closeChangePasswordModal();
+            // 清空表单
+            document.getElementById('old-password').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-password').value = '';
+        } else {
+            throw new Error(data.message || '修改密码失败');
+        }
+    } catch (error) {
+        console.error('修改密码失败:', error);
+        showMessage(error.message || '修改密码失败，请重试', 'error');
+    } finally {
+        // 恢复按钮状态
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
 }
 
 // ==================== 卡密管理功能 ====================

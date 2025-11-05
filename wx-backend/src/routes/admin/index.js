@@ -18,12 +18,35 @@ router.use('/referral-links', referralLinksRouter);
 router.post('/login', asyncHandler(async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return error(res, '用户名和密码不能为空', 400);
-  const users = await query('SELECT id, username, role FROM users WHERE username = ? AND password = ?', [username, password]);
+
+  const bcrypt = require('bcryptjs');
+  const users = await query('SELECT id, username, role, password FROM users WHERE username = ?', [username]);
   if (users.length === 0) return error(res, '用户名或密码错误', 401);
   if (users[0].role !== 'admin') return error(res, '权限不足，需要管理员权限', 403);
+
+  // 验证密码：支持兼容明文和哈希密码
+  const user = users[0];
+  let isValidPassword = false;
+
+  // 如果密码已经是哈希值（以$2a$或$2b$开头），使用bcrypt验证
+  if (user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$'))) {
+    isValidPassword = await bcrypt.compare(password, user.password);
+  } else {
+    // 兼容旧的明文密码，第一次登录成功后自动升级为哈希密码
+    isValidPassword = user.password === password;
+
+    // 如果是明文密码且验证成功，升级为哈希密码
+    if (isValidPassword && !user.password.startsWith('$2a$') && !user.password.startsWith('$2b$')) {
+      const hashedPassword = await bcrypt.hash(password, 12);
+      await query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, user.id]);
+    }
+  }
+
+  if (!isValidPassword) return error(res, '用户名或密码错误', 401);
+
   const { generateToken } = require('../../utils/jwt');
-  const token = generateToken({ userId: users[0].id });
-  return success(res, { token, user: users[0] }, '登录成功');
+  const token = generateToken({ userId: user.id });
+  return success(res, { token, user: { id: user.id, username: user.username, role: user.role } }, '登录成功');
 }));
 
 // 仪表盘统计
@@ -57,10 +80,39 @@ router.put('/profile', adminAuth, asyncHandler(async (req, res) => {
 
 router.post('/change-password', adminAuth, asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body || {};
+
+  // 密码强度验证
+  if (!oldPassword || !newPassword) {
+    return error(res, '当前密码和新密码不能为空', 400);
+  }
+
+  if (newPassword.length < 6) {
+    return error(res, '新密码长度至少6位', 400);
+  }
+
+  const bcrypt = require('bcryptjs');
   const users = await query('SELECT password FROM users WHERE id = ?', [req.user.id]);
   if (users.length === 0) return error(res, '用户不存在', 404);
-  if (users[0].password !== oldPassword) return error(res, '当前密码不正确', 400);
-  await query('UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?', [newPassword, req.user.id]);
+
+  const user = users[0];
+  let isValidOldPassword = false;
+
+  // 验证当前密码：支持兼容明文和哈希密码
+  if (user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$'))) {
+    isValidOldPassword = await bcrypt.compare(oldPassword, user.password);
+  } else {
+    // 兼容旧的明文密码
+    isValidOldPassword = user.password === oldPassword;
+  }
+
+  if (!isValidOldPassword) {
+    return error(res, '当前密码不正确', 400);
+  }
+
+  // 生成新密码的哈希值
+  const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+  await query('UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?', [hashedNewPassword, req.user.id]);
+
   return success(res, null, '密码已更新');
 }));
 
