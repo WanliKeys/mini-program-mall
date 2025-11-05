@@ -769,7 +769,7 @@ async function handlePaymentSuccess(paymentNo, thirdPartyNo, paymentMethod) {
       // 分配具体卡密
       console.log('分配卡密...');
       for (const item of items) {
-        const assignResult = await assignCardCodes(item.product_id, item.quantity);
+        const assignResult = await assignCardCodes(item.product_id, item.quantity, order.id);
         if (assignResult.success) {
           console.log(`✅ 商品${item.product_id}分配卡密成功:`, {
             cardCount: assignResult.cardCodes?.length || 0

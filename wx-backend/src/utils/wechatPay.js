@@ -8,12 +8,25 @@ const moment = require('moment');
  */
 class WeChatPay {
   constructor() {
-    this.appId = process.env.WECHAT_APPID;
-    this.mchId = process.env.WECHAT_PAY_MCHID;
-    this.privateKeyPath = process.env.WECHAT_PAY_PRIVATE_KEY_PATH;
-    this.certSerialNo = process.env.WECHAT_PAY_CERT_SERIAL_NO;
-    this.apiV3Key = (process.env.WECHAT_PAY_APIV3_KEY || '').trim();
-    this.notifyUrl = process.env.WECHAT_PAY_NOTIFY_URL;
+    // 添加硬编码的默认值作为备用
+    this.appId = process.env.WECHAT_APPID || 'wx0b1ce2aa786ec457';
+    this.mchId = process.env.WECHAT_PAY_MCHID || '1728730424';
+    this.privateKeyPath = process.env.WECHAT_PAY_PRIVATE_KEY_PATH || '/var/www/mall/wx-backend/certs/apiclient_key.pem';
+    this.certSerialNo = process.env.WECHAT_PAY_CERT_SERIAL_NO || '52561F95DFC276248CAB5F5B328AACBD29796490';
+    this.apiV3Key = (process.env.WECHAT_PAY_APIV3_KEY || '6A17F7871DD7E4B83F0092EC44819F98').trim();
+    this.notifyUrl = process.env.WECHAT_PAY_NOTIFY_URL || 'https://jxxcfwlkj.cn/api/payments/callback/wechat';
+
+    // 添加详细的调试日志
+    console.log('微信支付配置调试:', {
+      appId: this.appId,
+      mchId: this.mchId,
+      privateKeyPath: this.privateKeyPath,
+      certSerialNo: this.certSerialNo,
+      certSerialNoLength: this.certSerialNo ? this.certSerialNo.length : 0,
+      apiV3KeyLength: this.apiV3Key.length,
+      notifyUrl: this.notifyUrl,
+      envCertSerialNo: process.env.WECHAT_PAY_CERT_SERIAL_NO
+    });
 
     this.baseURL = 'https://api.mch.weixin.qq.com';
     this.platformCertificates = new Map(); // 缓存平台证书
@@ -175,6 +188,16 @@ class WeChatPay {
   generateSignature(method, url, timestamp, nonce, body = '') {
     const message = `${method}\n${url}\n${timestamp}\n${nonce}\n${body}\n`;
 
+    console.log('微信支付签名信息:', {
+      method,
+      url,
+      timestamp,
+      nonce,
+      bodyLength: body.length,
+      body: body.length > 200 ? body.substring(0, 200) + '...' : body,
+      message: message.replace(/\n/g, '\\n')
+    });
+
     if (!this.privateKey) {
       throw new Error('微信支付私钥未配置');
     }
@@ -183,6 +206,11 @@ class WeChatPay {
       .createSign('RSA-SHA256')
       .update(message)
       .sign(this.privateKey, 'base64');
+
+    console.log('微信支付签名结果:', {
+      signatureLength: signature.length,
+      signaturePrefix: signature.substring(0, 20) + '...'
+    });
 
     return signature;
   }
@@ -194,8 +222,19 @@ class WeChatPay {
     const timestamp = Math.floor(Date.now() / 1000);
     const nonce = Math.random().toString(36).substr(2, 15);
     const signature = this.generateSignature(method, url, timestamp, nonce, body);
-    
-    return `WECHATPAY2-SHA256-RSA2048 mchid="${this.mchId}",nonce_str="${nonce}",timestamp="${timestamp}",serial_no="${this.certSerialNo}",signature="${signature}"`;
+
+    const authHeader = `WECHATPAY2-SHA256-RSA2048 mchid="${this.mchId}",nonce_str="${nonce}",timestamp="${timestamp}",serial_no="${this.certSerialNo}",signature="${signature}"`;
+
+    console.log('微信支付Authorization头信息:', {
+      mchid: this.mchId,
+      nonce_str: nonce,
+      timestamp: timestamp,
+      serial_no: this.certSerialNo,
+      signatureLength: signature.length,
+      authHeaderLength: authHeader.length
+    });
+
+    return authHeader;
   }
 
   /**

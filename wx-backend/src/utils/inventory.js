@@ -211,7 +211,7 @@ async function cleanupExpiredReservations() {
  * @param {number} quantity 数量
  * @returns {Promise<Object>} 分配结果
  */
-async function assignCardCodes(productId, quantity) {
+async function assignCardCodes(productId, quantity, orderId = null) {
   try {
     // 获取商品卡密价格
     const product = await query(
@@ -247,11 +247,22 @@ async function assignCardCodes(productId, quantity) {
     // 更新卡密状态
     const cardIds = cards.map(card => card.id);
     await query(`
-      UPDATE card_codes 
-      SET status = 'shipped' 
+      UPDATE card_codes
+      SET status = 'shipped'
       WHERE id IN (${cardIds.map(() => '?').join(',')})
     `, cardIds);
-    
+
+    // 如果有订单ID，建立订单与卡密的关联
+    if (orderId && cards.length > 0) {
+      const firstCardId = cards[0].id;
+      await query(
+        'UPDATE orders SET card_code_id = ?, updated_at = NOW() WHERE id = ?',
+        [firstCardId, orderId]
+      );
+
+      console.log(`[card] 订单 ${orderId} 分配卡密 ${cards[0].code} (ID: ${firstCardId})`);
+    }
+
     return {
       success: true,
       cardCodes: cards.map(card => card.code),

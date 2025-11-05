@@ -216,6 +216,8 @@ router.post('/', asyncHandler(async (req, res) => {
       price,
       originalPrice,
       stock,
+      cardPrice,
+      cardStock,
       status = 1,
       tags,
       image: imageFromBody
@@ -227,6 +229,8 @@ router.post('/', asyncHandler(async (req, res) => {
       price,
       originalPrice,
       stock,
+      cardPrice,
+      cardStock,
       status,
       tags,
       imageFromBody
@@ -255,8 +259,8 @@ router.post('/', asyncHandler(async (req, res) => {
     const insertSql = `
       INSERT INTO products (
         category_id, name, description, image, images, price, original_price,
-        stock, status, tags, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        stock, card_price, card_stock, status, tags, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     `;
     const insertValues = [
       categoryId,
@@ -267,6 +271,8 @@ router.post('/', asyncHandler(async (req, res) => {
       price,
       originalPrice,
       stock || 0,
+      cardPrice || null,
+      cardStock || 0,
       status,
       JSON.stringify(tagsArray)
     ];
@@ -297,6 +303,8 @@ router.put('/:id', asyncHandler(async (req, res) => {
       price,
       originalPrice,
       stock,
+      cardPrice,
+      cardStock,
       status,
       tags,
       image
@@ -348,7 +356,17 @@ router.put('/:id', asyncHandler(async (req, res) => {
       updateFields.push('stock = ?');
       updateValues.push(stock);
     }
-    
+
+    if (cardPrice !== undefined) {
+      updateFields.push('card_price = ?');
+      updateValues.push(cardPrice || null);
+    }
+
+    if (cardStock !== undefined) {
+      updateFields.push('card_stock = ?');
+      updateValues.push(cardStock || 0);
+    }
+
     if (status !== undefined) {
       updateFields.push('status = ?');
       updateValues.push(status);
