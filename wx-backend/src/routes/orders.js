@@ -139,9 +139,9 @@ router.post('/', asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const { productId, quantity = 1, addressId, externalOrderNo, remark, paymentMethod = 'wechat', isReferral, linkCode, partnerOrderNo, notifyUrl } = req.body;
     
-    // 验证参数
-    if (!productId || !addressId) {
-      return error(res, '商品ID和收货地址不能为空', 400);
+    // 验证参数（移除地址功能后，地址可为空）
+    if (!productId) {
+      return error(res, '商品ID不能为空', 400);
     }
 
     // 获取商品信息
