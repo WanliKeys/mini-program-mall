@@ -899,59 +899,162 @@ async function notifyThirdParty(order, payment) {
   }
 }
 
-// 辅助函数：通知引流方
+// 辅助函数：通知引流方（带重试机制）
 async function notifyReferralPartner(order, payment) {
   try {
     // 检查是否是引流订单
     const referralOrders = await query(
-      `SELECT ro.*, rl.link_code 
-       FROM referral_orders ro 
-       JOIN referral_links rl ON ro.referral_link_id = rl.id 
+      `SELECT ro.*, rl.link_code
+       FROM referral_orders ro
+       JOIN referral_links rl ON ro.referral_link_id = rl.id
        WHERE ro.our_order_id = ?`,
       [order.id]
     );
-    
+
     if (referralOrders.length === 0) {
       console.log('非引流订单，跳过引流方通知');
       return;
     }
-    
+
     const referralOrder = referralOrders[0];
-    
+
+    // 获取订单的卡密信息
+    let cardCodes = [];
+    try {
+      const cardRecords = await query(
+        `SELECT cc.code
+         FROM card_codes cc
+         JOIN order_card_cards occ ON cc.id = occ.card_code_id
+         WHERE occ.order_id = ? AND cc.status = 'shipped'
+         ORDER BY cc.id`,
+        [order.id]
+      );
+
+      // 如果没有找到order_card_cards表，尝试从orders表直接关联
+      if (cardRecords.length === 0) {
+        const directCardRecords = await query(
+          `SELECT cc.code
+           FROM card_codes cc
+           WHERE cc.id = (SELECT card_code_id FROM orders WHERE id = ?)
+             AND cc.status = 'shipped'`,
+          [order.id]
+        );
+        cardCodes = directCardRecords.map(record => record.code);
+      } else {
+        cardCodes = cardRecords.map(record => record.code);
+      }
+
+      console.log(`获取到订单 ${order.id} 的卡密数量: ${cardCodes.length}`);
+    } catch (cardError) {
+      console.warn('获取卡密信息失败:', cardError.message);
+      // 卡密获取失败不影响主通知流程
+    }
+
     const notifyData = {
       orderNo: referralOrder.partner_order_no,
       amount: parseFloat(order.total_amount),
-      status: 'paid'
+      status: 'paid',
+      cardCodes: cardCodes  // 新增卡密数组字段
     };
-    
-    console.log('通知引流方:', referralOrder.notify_url, notifyData);
-    
-    const response = await axios.post(referralOrder.notify_url, notifyData, {
-      timeout: 10000,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    // 更新引流订单状态
-    await query(
-      'UPDATE referral_orders SET status = ?, updated_at = NOW() WHERE id = ?',
-      ['paid', referralOrder.id]
-    );
-    
-    console.log('引流方通知成功:', response.data);
-    
+
+    // 调用带重试机制的通知函数
+    await notifyWithRetry(referralOrder, notifyData);
+
   } catch (error) {
-    console.error('通知引流方失败:', error.message);
-    
-    // 更新为失败状态
-    if (referralOrders && referralOrders.length > 0) {
+    console.error('引流方通知流程失败:', error.message);
+  }
+}
+
+// 重试机制实现
+async function notifyWithRetry(referralOrder, notifyData) {
+  const maxRetries = 5;
+  const retryIntervals = [30, 60, 300, 900, 1800]; // 30秒, 1分钟, 5分钟, 15分钟, 30分钟
+  const timeout = 10000; // 10秒超时
+
+  let lastError = null;
+  let retryCount = 0;
+
+  console.log(`开始通知引流方: ${referralOrder.notify_url}`);
+
+  for (retryCount = 0; retryCount <= maxRetries; retryCount++) {
+    try {
+      // 如果不是第一次重试，等待指定间隔
+      if (retryCount > 0) {
+        const waitTime = retryIntervals[Math.min(retryCount - 1, retryIntervals.length - 1)];
+        console.log(`第${retryCount}次重试，等待${waitTime}秒...`);
+        await sleep(waitTime * 1000);
+      }
+
+      console.log(`第${retryCount + 1}次尝试通知引流方...`);
+
+      // 发送HTTP请求
+      const response = await axios.post(referralOrder.notify_url, notifyData, {
+        timeout: timeout,
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mall-Referral-System/1.0'
+        }
+      });
+
+      // 请求成功
+      console.log('✅ 引流方通知成功:', response.data);
+
+      // 更新引流订单状态为成功
       await query(
         'UPDATE referral_orders SET status = ?, updated_at = NOW() WHERE id = ?',
-        ['failed', referralOrders[0].id]
+        ['paid', referralOrder.id]
       );
+
+      return response.data;
+
+    } catch (error) {
+      lastError = error;
+
+      console.error(`❌ 第${retryCount + 1}次通知失败:`, error.message);
+
+      // 记录详细的错误信息
+      if (error.code === 'ECONNABORTED') {
+        console.error('超时错误，请求超过10秒未响应');
+      } else if (error.code === 'ENOTFOUND') {
+        console.error('域名解析失败，请检查notifyUrl是否正确');
+      } else if (error.response) {
+        console.error('HTTP错误:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data
+        });
+      } else {
+        console.error('网络错误:', error.code);
+      }
+
+      // 如果这是最后一次尝试，不再重试
+      if (retryCount === maxRetries) {
+        console.error(`❌ 重试${maxRetries}次后仍然失败，放弃通知`);
+        break;
+      }
+
+      // 继续下一次重试
     }
   }
+
+  // 所有重试都失败了，更新为失败状态
+  console.error(`❌ 引流方通知最终失败: ${lastError?.message}`);
+
+  try {
+    await query(
+      'UPDATE referral_orders SET status = ?, updated_at = NOW() WHERE id = ?',
+      ['failed', referralOrder.id]
+    );
+  } catch (updateError) {
+    console.error('更新引流订单状态失败:', updateError.message);
+  }
+
+  throw lastError || new Error('引流方通知失败');
+}
+
+// 睡眠函数
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 module.exports = router;
