@@ -119,6 +119,30 @@ function bindEvents() {
             changePageSize(e.target.value);
         });
     }
+
+    // 商品页面大小选择器事件监听
+    const productsPageSizeSelect = document.getElementById('products-page-size-select');
+    if (productsPageSizeSelect) {
+        productsPageSizeSelect.addEventListener('change', function(e) {
+            changeProductsPageSize(e.target.value);
+        });
+    }
+
+    // 订单页面大小选择器事件监听
+    const ordersPageSizeSelect = document.getElementById('orders-page-size-select');
+    if (ordersPageSizeSelect) {
+        ordersPageSizeSelect.addEventListener('change', function(e) {
+            changeOrdersPageSize(e.target.value);
+        });
+    }
+
+    // 分类页面大小选择器事件监听
+    const categoriesPageSizeSelect = document.getElementById('categories-page-size-select');
+    if (categoriesPageSizeSelect) {
+        categoriesPageSizeSelect.addEventListener('change', function(e) {
+            changeCategoriesPageSize(e.target.value);
+        });
+    }
 }
 
 // 处理登录
@@ -906,42 +930,52 @@ async function updateOrderStatus(orderId, newStatus) {
 }
 
 // 加载商品列表
-async function loadProducts(page = 1) {
+async function loadProducts() {
+    productsStore.loading = true;
+    productsStore.error = null;
+
     const tbody = document.getElementById('products-table');
     tbody.innerHTML = '<tr><td colspan="8" class="text-center"><div class="loading show"><div class="spinner-border" role="status"><span class="visually-hidden">加载中...</span></div></div></td></tr>';
-    
+
     try {
         // 获取筛选条件
         const categoryId = getDropdownValue('category-dropdown');
         const status = getDropdownValue('status-dropdown');
         const keyword = document.getElementById('product-search')?.value || '';
-        
+
+        // 更新筛选条件
+        productsStore.filters = { categoryId, status, keyword };
+
         // 构建查询参数
         const params = new URLSearchParams({
-            page: page,
-            pageSize: 10
+            page: productsStore.pagination.page,
+            pageSize: productsStore.pagination.pageSize
         });
-        
+
         if (categoryId) params.append('categoryId', categoryId);
         if (status) params.append('status', status);
         if (keyword) params.append('keyword', keyword);
-        
+
         const response = await fetch(`${API_BASE}/admin/products?${params.toString()}`, {
             headers: {
                 'Authorization': `Bearer ${currentToken}`,
                 'Content-Type': 'application/json'
             }
         });
-        
+
         if (!response.ok) {
             throw new Error('获取商品列表失败');
         }
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
+            productsStore.list = data.data.products;
+            productsStore.pagination = data.data.pagination;
+            productsStore.error = null;
+
             renderProductsTable(data.data.products);
-            renderPagination(data.data.pagination, 'products');
+            updateProductsPagination();
         } else {
             throw new Error(data.message);
         }
@@ -1095,37 +1129,45 @@ async function loadCategoriesForModal() {
 
 // 加载分类列表
 async function loadCategories() {
+    categoriesStore.loading = true;
+    categoriesStore.error = null;
+
     const tbody = document.getElementById('categories-table');
     tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="loading show"><div class="spinner-border" role="status"><span class="visually-hidden">加载中...</span></div></div></td></tr>';
-    
+
     // 获取搜索和筛选参数
     const searchTerm = document.getElementById('category-search')?.value || '';
     const statusFilter = getDropdownValue('category-status-dropdown') || '';
-    
+
+    // 更新筛选条件
+    categoriesStore.filters = { status: statusFilter, keyword: searchTerm };
+
     // 构建查询参数
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({
+        page: categoriesStore.pagination.page,
+        pageSize: categoriesStore.pagination.pageSize
+    });
+
     if (searchTerm) params.append('search', searchTerm);
     if (statusFilter) params.append('status', statusFilter);
-    const queryString = params.toString();
-    const url = queryString ? `${API_BASE}/admin/categories?${queryString}` : `${API_BASE}/admin/categories`;
-    
+
     try {
-        const response = await fetch(url, {
+        const response = await fetch(`${API_BASE}/admin/categories?${params.toString()}`, {
             headers: {
                 'Authorization': `Bearer ${currentToken}`,
                 'Content-Type': 'application/json'
             }
         });
-        
+
         if (!response.ok) {
             throw new Error('获取分类列表失败');
         }
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             // 后端可能未按 search/status 过滤，这里做一次前端兜底过滤
-            let list = Array.isArray(data.data) ? data.data : [];
+            let list = Array.isArray(data.data?.categories) ? data.data.categories : [];
             if (searchTerm) {
                 const kw = searchTerm.toLowerCase();
                 list = list.filter(c => (c.name || '').toLowerCase().includes(kw));
@@ -1133,9 +1175,20 @@ async function loadCategories() {
             if (statusFilter !== '') {
                 list = list.filter(c => String(c.status) === String(statusFilter));
             }
+
+            categoriesStore.list = list;
+            categoriesStore.pagination = data.data.pagination || { page: 1, pageSize: 10, total: 0, totalPages: 0 };
+            categoriesStore.error = null;
+
             renderCategoriesTable(list);
+            updateCategoriesPagination();
+
             // 同时更新商品页面的分类筛选
-            updateCategoryFilter(data.data);
+            if (data.data?.allCategories) {
+                updateCategoryFilter(data.data.allCategories);
+            } else if (data.data) {
+                updateCategoryFilter(data.data);
+            }
         } else {
             throw new Error(data.message);
         }
@@ -1401,20 +1454,23 @@ async function persistBannerSort(banners) {
 }
 
 // 加载订单列表
-async function loadOrders(page = 1, pageSize = 10) {
+async function loadOrders() {
+    ordersStore.loading = true;
+    ordersStore.error = null;
+
     const tbody = document.getElementById('orders-table');
     tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="loading show"><div class="spinner-border" role="status"><span class="visually-hidden">加载中...</span></div></div></td></tr>';
-    
+
     // 调试信息
     console.log('loadOrders called, currentToken:', currentToken ? 'exists' : 'null');
-    
+
     // 检查token是否存在
     if (!currentToken) {
         console.error('No token found, redirecting to login');
         showPage('login');
         return;
     }
-    
+
     try {
         // 读取筛选条件
         const statusFilter = getDropdownValue('order-status-dropdown') || '';
@@ -1422,7 +1478,14 @@ async function loadOrders(page = 1, pageSize = 10) {
         const dateFrom = document.getElementById('order-date-from')?.value || '';
         const dateTo = document.getElementById('order-date-to')?.value || '';
 
-        const params = new URLSearchParams({ page, pageSize });
+        // 更新筛选条件
+        ordersStore.filters = { status: statusFilter, keyword: searchTerm };
+
+        const params = new URLSearchParams({
+            page: ordersStore.pagination.page,
+            pageSize: ordersStore.pagination.pageSize
+        });
+
         if (statusFilter) params.append('status', statusFilter);
         if (searchTerm) params.append('search', searchTerm);
         if (dateFrom) params.append('from', dateFrom);
@@ -1433,9 +1496,9 @@ async function loadOrders(page = 1, pageSize = 10) {
                 'Authorization': `Bearer ${currentToken}`
             }
         });
-        
+
         console.log('API response status:', response.status);
-        
+
         if (!response.ok) {
             const errorText = await response.text();
             console.error('API error response:', errorText);
@@ -1457,7 +1520,13 @@ async function loadOrders(page = 1, pageSize = 10) {
         
         if (data.success) {
             const list = Array.isArray(data.data?.orders) ? data.data.orders : (data.data || []);
+
+            ordersStore.list = list;
+            ordersStore.pagination = data.data.pagination || { page: 1, pageSize: 10, total: 0, totalPages: 0 };
+            ordersStore.error = null;
+
             renderOrdersTable(list);
+
             // 更新统计卡片（顶部 1x4）
             if (data.data && data.data.stats) {
                 const s = data.data.stats;
@@ -1467,10 +1536,9 @@ async function loadOrders(page = 1, pageSize = 10) {
                 safeSet('completed-orders-count', s.completed ?? '-');
                 safeSet('total-amount', typeof s.totalAmount === 'number' ? `¥${Number(s.totalAmount).toFixed(2)}` : '-');
             }
+
             // 更新分页信息
-            if (data.data && data.data.pagination) {
-                renderPagination(data.data.pagination, 'orders');
-            }
+            updateOrdersPagination();
         } else {
             throw new Error(data.message || '获取订单列表失败');
         }
@@ -2173,6 +2241,33 @@ const cardCodeStore = {
     filters: { search: '', price: '', status: '' }
 };
 
+// 商品状态管理
+const productsStore = {
+    list: [],
+    loading: false,
+    error: null,
+    pagination: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
+    filters: { categoryId: '', status: '', keyword: '' }
+};
+
+// 订单状态管理
+const ordersStore = {
+    list: [],
+    loading: false,
+    error: null,
+    pagination: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
+    filters: { status: '', keyword: '' }
+};
+
+// 分类状态管理
+const categoriesStore = {
+    list: [],
+    loading: false,
+    error: null,
+    pagination: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
+    filters: { status: '', keyword: '' }
+};
+
 // 加载卡密列表
 async function loadCardCodes() {
     try {
@@ -2819,6 +2914,372 @@ function hideReferralLinkModal() {
     const modal = document.getElementById('referral-link-modal');
     modal.style.display = 'none';
     currentReferralProduct = null;
+}
+
+// ==================== 商品分页功能 ====================
+
+// 更新商品分页
+function updateProductsPagination() {
+    const pagination = document.getElementById('products-pagination');
+    const paginationInfo = document.getElementById('products-pagination-info');
+    const pageSizeSelect = document.getElementById('products-page-size-select');
+
+    if (!pagination || !paginationInfo) return;
+
+    const { page, totalPages, total, pageSize } = productsStore.pagination;
+
+    // 更新页面大小选择器
+    if (pageSizeSelect) {
+        pageSizeSelect.value = pageSize;
+    }
+
+    // 更新分页信息显示
+    if (total > 0) {
+        paginationInfo.textContent = `第 ${page} 页，共 ${totalPages} 页 (共 ${total} 条记录)`;
+    } else {
+        paginationInfo.textContent = '暂无数据';
+    }
+
+    let html = '';
+
+    if (totalPages > 1) {
+        // 首页按钮
+        html += `<button class="pagination-btn" onclick="changeProductsPage(1)" ${page === 1 ? 'disabled' : ''}>
+            首页
+        </button>`;
+
+        // 上一页按钮
+        html += `<button class="pagination-btn" onclick="changeProductsPage(${page - 1})" ${page === 1 ? 'disabled' : ''}>
+            上一页
+        </button>`;
+
+        // 页码显示逻辑
+        let startPage = Math.max(1, page - 2);
+        let endPage = Math.min(totalPages, page + 2);
+
+        // 如果总页数很多，显示省略号
+        if (totalPages > 5) {
+            if (startPage > 1) {
+                html += `<button class="pagination-btn" onclick="changeProductsPage(1)">1</button>`;
+                if (startPage > 2) {
+                    html += `<span class="pagination-ellipsis">...</span>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeProductsPage(${i})">${i}</button>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<span class="pagination-ellipsis">...</span>`;
+                }
+                html += `<button class="pagination-btn" onclick="changeProductsPage(${totalPages})">${totalPages}</button>`;
+            }
+        } else {
+            // 总页数较少，显示所有页码
+            for (let i = 1; i <= totalPages; i++) {
+                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeProductsPage(${i})">${i}</button>`;
+            }
+        }
+
+        // 下一页按钮
+        html += `<button class="pagination-btn" onclick="changeProductsPage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>
+            下一页
+        </button>`;
+
+        // 末页按钮
+        html += `<button class="pagination-btn" onclick="changeProductsPage(${totalPages})" ${page === totalPages ? 'disabled' : ''}>
+            末页
+        </button>`;
+
+        // 添加页码跳转输入框
+        html += `
+            <div class="page-jump">
+                <span>跳转到</span>
+                <input type="number" id="products-page-jump-input" min="1" max="${totalPages}" value="${page}"
+                       onkeypress="if(event.key==='Enter') jumpToProductsPage()">
+                <button onclick="jumpToProductsPage()">确定</button>
+            </div>
+        `;
+    }
+
+    pagination.innerHTML = html;
+}
+
+// 切换商品页面
+function changeProductsPage(page) {
+    productsStore.pagination.page = page;
+    loadProducts();
+}
+
+// 商品页面大小改变事件处理
+function changeProductsPageSize(newPageSize) {
+    if (newPageSize !== productsStore.pagination.pageSize) {
+        productsStore.pagination.pageSize = parseInt(newPageSize);
+        productsStore.pagination.page = 1;
+        loadProducts();
+    }
+}
+
+// 商品页码跳转功能
+function jumpToProductsPage() {
+    const input = document.getElementById('products-page-jump-input');
+    if (!input) return;
+
+    const targetPage = parseInt(input.value);
+    const totalPages = productsStore.pagination.totalPages;
+
+    if (targetPage >= 1 && targetPage <= totalPages) {
+        changeProductsPage(targetPage);
+    } else {
+        input.value = productsStore.pagination.page;
+        showMessage('页码超出范围', 'error');
+    }
+}
+
+// ==================== 订单分页功能 ====================
+
+// 更新订单分页
+function updateOrdersPagination() {
+    const pagination = document.getElementById('orders-pagination');
+    const paginationInfo = document.getElementById('orders-pagination-info');
+    const pageSizeSelect = document.getElementById('orders-page-size-select');
+
+    if (!pagination || !paginationInfo) return;
+
+    const { page, totalPages, total, pageSize } = ordersStore.pagination;
+
+    // 更新页面大小选择器
+    if (pageSizeSelect) {
+        pageSizeSelect.value = pageSize;
+    }
+
+    // 更新分页信息显示
+    if (total > 0) {
+        paginationInfo.textContent = `第 ${page} 页，共 ${totalPages} 页 (共 ${total} 条记录)`;
+    } else {
+        paginationInfo.textContent = '暂无数据';
+    }
+
+    let html = '';
+
+    if (totalPages > 1) {
+        // 首页按钮
+        html += `<button class="pagination-btn" onclick="changeOrdersPage(1)" ${page === 1 ? 'disabled' : ''}>
+            首页
+        </button>`;
+
+        // 上一页按钮
+        html += `<button class="pagination-btn" onclick="changeOrdersPage(${page - 1})" ${page === 1 ? 'disabled' : ''}>
+            上一页
+        </button>`;
+
+        // 页码显示逻辑
+        let startPage = Math.max(1, page - 2);
+        let endPage = Math.min(totalPages, page + 2);
+
+        // 如果总页数很多，显示省略号
+        if (totalPages > 5) {
+            if (startPage > 1) {
+                html += `<button class="pagination-btn" onclick="changeOrdersPage(1)">1</button>`;
+                if (startPage > 2) {
+                    html += `<span class="pagination-ellipsis">...</span>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeOrdersPage(${i})">${i}</button>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<span class="pagination-ellipsis">...</span>`;
+                }
+                html += `<button class="pagination-btn" onclick="changeOrdersPage(${totalPages})">${totalPages}</button>`;
+            }
+        } else {
+            // 总页数较少，显示所有页码
+            for (let i = 1; i <= totalPages; i++) {
+                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeOrdersPage(${i})">${i}</button>`;
+            }
+        }
+
+        // 下一页按钮
+        html += `<button class="pagination-btn" onclick="changeOrdersPage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>
+            下一页
+        </button>`;
+
+        // 末页按钮
+        html += `<button class="pagination-btn" onclick="changeOrdersPage(${totalPages})" ${page === totalPages ? 'disabled' : ''}>
+            末页
+        </button>`;
+
+        // 添加页码跳转输入框
+        html += `
+            <div class="page-jump">
+                <span>跳转到</span>
+                <input type="number" id="orders-page-jump-input" min="1" max="${totalPages}" value="${page}"
+                       onkeypress="if(event.key==='Enter') jumpToOrdersPage()">
+                <button onclick="jumpToOrdersPage()">确定</button>
+            </div>
+        `;
+    }
+
+    pagination.innerHTML = html;
+}
+
+// 切换订单页面
+function changeOrdersPage(page) {
+    ordersStore.pagination.page = page;
+    loadOrders();
+}
+
+// 订单页面大小改变事件处理
+function changeOrdersPageSize(newPageSize) {
+    if (newPageSize !== ordersStore.pagination.pageSize) {
+        ordersStore.pagination.pageSize = parseInt(newPageSize);
+        ordersStore.pagination.page = 1;
+        loadOrders();
+    }
+}
+
+// 订单页码跳转功能
+function jumpToOrdersPage() {
+    const input = document.getElementById('orders-page-jump-input');
+    if (!input) return;
+
+    const targetPage = parseInt(input.value);
+    const totalPages = ordersStore.pagination.totalPages;
+
+    if (targetPage >= 1 && targetPage <= totalPages) {
+        changeOrdersPage(targetPage);
+    } else {
+        input.value = ordersStore.pagination.page;
+        showMessage('页码超出范围', 'error');
+    }
+}
+
+// ==================== 分类分页功能 ====================
+
+// 更新分类分页
+function updateCategoriesPagination() {
+    const pagination = document.getElementById('categories-pagination');
+    const paginationInfo = document.getElementById('categories-pagination-info');
+    const pageSizeSelect = document.getElementById('categories-page-size-select');
+
+    if (!pagination || !paginationInfo) return;
+
+    const { page, totalPages, total, pageSize } = categoriesStore.pagination;
+
+    // 更新页面大小选择器
+    if (pageSizeSelect) {
+        pageSizeSelect.value = pageSize;
+    }
+
+    // 更新分页信息显示
+    if (total > 0) {
+        paginationInfo.textContent = `第 ${page} 页，共 ${totalPages} 页 (共 ${total} 条记录)`;
+    } else {
+        paginationInfo.textContent = '暂无数据';
+    }
+
+    let html = '';
+
+    if (totalPages > 1) {
+        // 首页按钮
+        html += `<button class="pagination-btn" onclick="changeCategoriesPage(1)" ${page === 1 ? 'disabled' : ''}>
+            首页
+        </button>`;
+
+        // 上一页按钮
+        html += `<button class="pagination-btn" onclick="changeCategoriesPage(${page - 1})" ${page === 1 ? 'disabled' : ''}>
+            上一页
+        </button>`;
+
+        // 页码显示逻辑
+        let startPage = Math.max(1, page - 2);
+        let endPage = Math.min(totalPages, page + 2);
+
+        // 如果总页数很多，显示省略号
+        if (totalPages > 5) {
+            if (startPage > 1) {
+                html += `<button class="pagination-btn" onclick="changeCategoriesPage(1)">1</button>`;
+                if (startPage > 2) {
+                    html += `<span class="pagination-ellipsis">...</span>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeCategoriesPage(${i})">${i}</button>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<span class="pagination-ellipsis">...</span>`;
+                }
+                html += `<button class="pagination-btn" onclick="changeCategoriesPage(${totalPages})">${totalPages}</button>`;
+            }
+        } else {
+            // 总页数较少，显示所有页码
+            for (let i = 1; i <= totalPages; i++) {
+                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeCategoriesPage(${i})">${i}</button>`;
+            }
+        }
+
+        // 下一页按钮
+        html += `<button class="pagination-btn" onclick="changeCategoriesPage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>
+            下一页
+        </button>`;
+
+        // 末页按钮
+        html += `<button class="pagination-btn" onclick="changeCategoriesPage(${totalPages})" ${page === totalPages ? 'disabled' : ''}>
+            末页
+        </button>`;
+
+        // 添加页码跳转输入框
+        html += `
+            <div class="page-jump">
+                <span>跳转到</span>
+                <input type="number" id="categories-page-jump-input" min="1" max="${totalPages}" value="${page}"
+                       onkeypress="if(event.key==='Enter') jumpToCategoriesPage()">
+                <button onclick="jumpToCategoriesPage()">确定</button>
+            </div>
+        `;
+    }
+
+    pagination.innerHTML = html;
+}
+
+// 切换分类页面
+function changeCategoriesPage(page) {
+    categoriesStore.pagination.page = page;
+    loadCategories();
+}
+
+// 分类页面大小改变事件处理
+function changeCategoriesPageSize(newPageSize) {
+    if (newPageSize !== categoriesStore.pagination.pageSize) {
+        categoriesStore.pagination.pageSize = parseInt(newPageSize);
+        categoriesStore.pagination.page = 1;
+        loadCategories();
+    }
+}
+
+// 分类页码跳转功能
+function jumpToCategoriesPage() {
+    const input = document.getElementById('categories-page-jump-input');
+    if (!input) return;
+
+    const targetPage = parseInt(input.value);
+    const totalPages = categoriesStore.pagination.totalPages;
+
+    if (targetPage >= 1 && targetPage <= totalPages) {
+        changeCategoriesPage(targetPage);
+    } else {
+        input.value = categoriesStore.pagination.page;
+        showMessage('页码超出范围', 'error');
+    }
 }
 
 // 复制引流链接模板
