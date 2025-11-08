@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试跳转</title>
+</head>
+<body>
+    <h1>正在跳转到小程序...</h1>
+    <script src="https://res.wx.qq.com/open/js/jweixin-1.6.0.js"></script>
+    <script>
+        console.log('页面加载完成');
+        console.log('微信JS-SDK版本:', typeof wx);
+
+        setTimeout(function() {
+            if (typeof wx !== 'undefined') {
+                console.log('准备跳转小程序');
+                wx.navigateToMiniProgram({
+                    appId: 'wx0b1ce2aa786ec457',
+                    path: 'pages/index/index',
+                    success: function(res) {
+                        console.log('跳转成功:', res);
+                    },
+                    fail: function(err) {
+                        console.error('跳转失败:', err);
+                        alert('跳转失败: ' + err.errMsg);
+                    }
+                });
+            } else {
+                alert('微信JS-SDK未加载');
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

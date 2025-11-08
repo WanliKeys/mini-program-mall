@@ -1166,8 +1166,14 @@ async function loadCategories() {
         const data = await response.json();
 
         if (data.success) {
-            // 后端可能未按 search/status 过滤，这里做一次前端兜底过滤
-            let list = Array.isArray(data.data?.categories) ? data.data.categories : [];
+            // 后端返回分类数据在 data.data 中，而不是 data.data.categories
+            let list = Array.isArray(data.data) ? data.data : [];
+
+            // 由于后端没有做分页，我们需要在前端实现分页
+            const startIndex = (categoriesStore.pagination.page - 1) * categoriesStore.pagination.pageSize;
+            const endIndex = startIndex + categoriesStore.pagination.pageSize;
+
+            // 前端过滤
             if (searchTerm) {
                 const kw = searchTerm.toLowerCase();
                 list = list.filter(c => (c.name || '').toLowerCase().includes(kw));
@@ -1176,17 +1182,21 @@ async function loadCategories() {
                 list = list.filter(c => String(c.status) === String(statusFilter));
             }
 
-            categoriesStore.list = list;
-            categoriesStore.pagination = data.data.pagination || { page: 1, pageSize: 10, total: 0, totalPages: 0 };
+            // 更新总数
+            categoriesStore.pagination.total = list.length;
+            categoriesStore.pagination.totalPages = Math.ceil(list.length / categoriesStore.pagination.pageSize);
+
+            // 前端分页
+            const paginatedList = list.slice(startIndex, endIndex);
+
+            categoriesStore.list = paginatedList;
             categoriesStore.error = null;
 
-            renderCategoriesTable(list);
+            renderCategoriesTable(paginatedList);
             updateCategoriesPagination();
 
             // 同时更新商品页面的分类筛选
-            if (data.data?.allCategories) {
-                updateCategoryFilter(data.data.allCategories);
-            } else if (data.data) {
+            if (data.data) {
                 updateCategoryFilter(data.data);
             }
         } else {
