@@ -77,6 +77,25 @@ const ensureAdminSetup = async () => {
     );
 
     console.log('✅ 管理员初始化完成');
+
+    // 检查并更新 orders 表的 address_id 字段允许为空（支持虚拟商品）
+    try {
+      const addressCol = await query(
+        `SELECT IS_NULLABLE
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'orders'
+         AND COLUMN_NAME = 'address_id'`
+      );
+
+      if (addressCol.length > 0 && addressCol[0].IS_NULLABLE === 'NO') {
+        console.log('🔧 正在更新 orders 表，允许 address_id 字段为空（支持虚拟商品）...');
+        await query('ALTER TABLE orders MODIFY COLUMN address_id INT NULL COMMENT "收货地址ID（虚拟商品可为空）"');
+        console.log('✅ orders 表 address_id 字段已更新为可空');
+      }
+    } catch (e) {
+      console.warn('更新 orders 表 address_id 字段失败（可能已更新）:', e.message || e);
+    }
   } catch (e) {
     console.error('管理员初始化失败:', e.message || e);
   }
