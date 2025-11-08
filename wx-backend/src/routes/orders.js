@@ -198,14 +198,14 @@ router.post('/', asyncHandler(async (req, res) => {
     
     const totalAmount = parseFloat(product.price) * quantity;
     
-    // 创建订单
+    // 创建订单（允许地址为空）
     const orderResult = await query(
       `INSERT INTO orders (
         order_no, user_id, address_id, total_amount, payment_method, status, remark, external_order_no, source,
         reservation_id, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
-        orderNo, userId, addressId, totalAmount, paymentMethod, 'pending', remark || null,
+        orderNo, userId, addressId || null, totalAmount, paymentMethod, 'pending', remark || null,
         externalOrderNo || null, source, reservation.reservationId
       ]
     );
@@ -305,23 +305,26 @@ router.post('/batch', asyncHandler(async (req, res) => {
   try {
     const userId = req.user.id;
     const { items, addressId } = req.body;
-    
-    // 验证参数
-    if (!items || items.length === 0 || !addressId) {
-      return error(res, '购物车商品和收货地址不能为空', 400);
+
+    // 验证参数（移除地址强制要求）
+    if (!items || items.length === 0) {
+      return error(res, '购物车商品不能为空', 400);
     }
 
-    // 获取地址信息
-    const addresses = await query(
-      'SELECT * FROM addresses WHERE id = ? AND user_id = ?',
-      [addressId, userId]
-    );
+    // 获取地址信息（可选）
+    let address = null;
+    if (addressId) {
+      const addresses = await query(
+        'SELECT * FROM addresses WHERE id = ? AND user_id = ?',
+        [addressId, userId]
+      );
 
-    if (addresses.length === 0) {
-      return error(res, '收货地址不存在', 404);
+      if (addresses.length === 0) {
+        return error(res, '收货地址不存在', 404);
+      }
+
+      address = addresses[0];
     }
-
-    const address = addresses[0];
     
     // 生成订单号
     const orderNo = 'ML' + moment().format('YYYYMMDDHHmmss') + Math.random().toString(36).substr(2, 4).toUpperCase();
@@ -355,14 +358,14 @@ router.post('/batch', asyncHandler(async (req, res) => {
       totalAmount += parseFloat(product.price) * item.quantity;
     }
     
-    // 创建订单
+    // 创建订单（允许地址为空）
     const orderResult = await query(
       `INSERT INTO orders (
         order_no, user_id, address_id, total_amount, status, source,
         created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
-        orderNo, userId, address.id, totalAmount, 'pending', 'direct'
+        orderNo, userId, addressId || null, totalAmount, 'pending', 'direct'
       ]
     );
     
@@ -405,11 +408,11 @@ router.post('/batch', asyncHandler(async (req, res) => {
       totalAmount,
       status: 'pending',
       source: 'direct',
-      receiverInfo: {
+      receiverInfo: address ? {
         name: address.name,
         phone: address.phone,
         address: `${address.province} ${address.city} ${address.district} ${address.detail}`
-      },
+      } : null,
       items: validItems.map(item => ({
         productId: item.product.id,
         name: item.product.name,
