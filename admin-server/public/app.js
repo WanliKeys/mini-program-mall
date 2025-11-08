@@ -2442,58 +2442,59 @@ function updateCardCodesPagination() {
 
     let html = '';
 
-    if (totalPages > 1) {
-        // 首页按钮
-        html += `<button class="pagination-btn" onclick="changeCardCodePage(1)" ${page === 1 ? 'disabled' : ''}>
-            首页
-        </button>`;
+    // 始终显示分页控件，保持UI一致性
+    // 首页按钮
+    html += `<button class="pagination-btn" onclick="changeCardCodePage(1)" ${page === 1 || totalPages <= 1 ? 'disabled' : ''}>
+        首页
+    </button>`;
 
-        // 上一页按钮
-        html += `<button class="pagination-btn" onclick="changeCardCodePage(${page - 1})" ${page === 1 ? 'disabled' : ''}>
-            上一页
-        </button>`;
+    // 上一页按钮
+    html += `<button class="pagination-btn" onclick="changeCardCodePage(${page - 1})" ${page === 1 || totalPages <= 1 ? 'disabled' : ''}>
+        上一页
+    </button>`;
 
-        // 页码显示逻辑
-        let startPage = Math.max(1, page - 2);
-        let endPage = Math.min(totalPages, page + 2);
+    // 页码显示逻辑
+    let startPage = Math.max(1, page - 2);
+    let endPage = Math.min(totalPages, page + 2);
 
-        // 如果总页数很多，显示省略号
-        if (totalPages > 5) {
-            if (startPage > 1) {
-                html += `<button class="pagination-btn" onclick="changeCardCodePage(1)">1</button>`;
-                if (startPage > 2) {
-                    html += `<span class="pagination-ellipsis">...</span>`;
-                }
-            }
-
-            for (let i = startPage; i <= endPage; i++) {
-                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeCardCodePage(${i})">${i}</button>`;
-            }
-
-            if (endPage < totalPages) {
-                if (endPage < totalPages - 1) {
-                    html += `<span class="pagination-ellipsis">...</span>`;
-                }
-                html += `<button class="pagination-btn" onclick="changeCardCodePage(${totalPages})">${totalPages}</button>`;
-            }
-        } else {
-            // 总页数较少，显示所有页码
-            for (let i = 1; i <= totalPages; i++) {
-                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeCardCodePage(${i})">${i}</button>`;
+    // 如果总页数很多，显示省略号
+    if (totalPages > 5) {
+        if (startPage > 1) {
+            html += `<button class="pagination-btn" onclick="changeCardCodePage(1)">1</button>`;
+            if (startPage > 2) {
+                html += `<span class="pagination-ellipsis">...</span>`;
             }
         }
 
-        // 下一页按钮
-        html += `<button class="pagination-btn" onclick="changeCardCodePage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>
-            下一页
-        </button>`;
+        for (let i = startPage; i <= endPage; i++) {
+            html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeCardCodePage(${i})">${i}</button>`;
+        }
 
-        // 末页按钮
-        html += `<button class="pagination-btn" onclick="changeCardCodePage(${totalPages})" ${page === totalPages ? 'disabled' : ''}>
-            末页
-        </button>`;
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+            html += `<button class="pagination-btn" onclick="changeCardCodePage(${totalPages})">${totalPages}</button>`;
+        }
+    } else {
+        // 总页数较少，显示所有页码
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeCardCodePage(${i})">${i}</button>`;
+        }
+    }
 
-        // 添加页码跳转输入框
+    // 下一页按钮
+    html += `<button class="pagination-btn" onclick="changeCardCodePage(${page + 1})" ${page === totalPages || totalPages <= 1 ? 'disabled' : ''}>
+        下一页
+    </button>`;
+
+    // 末页按钮
+    html += `<button class="pagination-btn" onclick="changeCardCodePage(${totalPages})" ${page === totalPages || totalPages <= 1 ? 'disabled' : ''}>
+        末页
+    </button>`;
+
+    // 添加页码跳转输入框
+    if (totalPages > 0) {
         html += `
             <div class="page-jump">
                 <span>跳转到</span>
@@ -2952,58 +2953,59 @@ function updateProductsPagination() {
 
     let html = '';
 
-    if (totalPages > 1) {
-        // 首页按钮
-        html += `<button class="pagination-btn" onclick="changeProductsPage(1)" ${page === 1 ? 'disabled' : ''}>
-            首页
-        </button>`;
+    // 始终显示分页控件，保持UI一致性
+    // 首页按钮
+    html += `<button class="pagination-btn" onclick="changeProductsPage(1)" ${page === 1 || totalPages <= 1 ? 'disabled' : ''}>
+        首页
+    </button>`;
 
-        // 上一页按钮
-        html += `<button class="pagination-btn" onclick="changeProductsPage(${page - 1})" ${page === 1 ? 'disabled' : ''}>
-            上一页
-        </button>`;
+    // 上一页按钮
+    html += `<button class="pagination-btn" onclick="changeProductsPage(${page - 1})" ${page === 1 || totalPages <= 1 ? 'disabled' : ''}>
+        上一页
+    </button>`;
 
-        // 页码显示逻辑
-        let startPage = Math.max(1, page - 2);
-        let endPage = Math.min(totalPages, page + 2);
+    // 页码显示逻辑
+    let startPage = Math.max(1, page - 2);
+    let endPage = Math.min(totalPages, page + 2);
 
-        // 如果总页数很多，显示省略号
-        if (totalPages > 5) {
-            if (startPage > 1) {
-                html += `<button class="pagination-btn" onclick="changeProductsPage(1)">1</button>`;
-                if (startPage > 2) {
-                    html += `<span class="pagination-ellipsis">...</span>`;
-                }
-            }
-
-            for (let i = startPage; i <= endPage; i++) {
-                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeProductsPage(${i})">${i}</button>`;
-            }
-
-            if (endPage < totalPages) {
-                if (endPage < totalPages - 1) {
-                    html += `<span class="pagination-ellipsis">...</span>`;
-                }
-                html += `<button class="pagination-btn" onclick="changeProductsPage(${totalPages})">${totalPages}</button>`;
-            }
-        } else {
-            // 总页数较少，显示所有页码
-            for (let i = 1; i <= totalPages; i++) {
-                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeProductsPage(${i})">${i}</button>`;
+    // 如果总页数很多，显示省略号
+    if (totalPages > 5) {
+        if (startPage > 1) {
+            html += `<button class="pagination-btn" onclick="changeProductsPage(1)">1</button>`;
+            if (startPage > 2) {
+                html += `<span class="pagination-ellipsis">...</span>`;
             }
         }
 
-        // 下一页按钮
-        html += `<button class="pagination-btn" onclick="changeProductsPage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>
-            下一页
-        </button>`;
+        for (let i = startPage; i <= endPage; i++) {
+            html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeProductsPage(${i})">${i}</button>`;
+        }
 
-        // 末页按钮
-        html += `<button class="pagination-btn" onclick="changeProductsPage(${totalPages})" ${page === totalPages ? 'disabled' : ''}>
-            末页
-        </button>`;
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+            html += `<button class="pagination-btn" onclick="changeProductsPage(${totalPages})">${totalPages}</button>`;
+        }
+    } else {
+        // 总页数较少，显示所有页码
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeProductsPage(${i})">${i}</button>`;
+        }
+    }
 
-        // 添加页码跳转输入框
+    // 下一页按钮
+    html += `<button class="pagination-btn" onclick="changeProductsPage(${page + 1})" ${page === totalPages || totalPages <= 1 ? 'disabled' : ''}>
+        下一页
+    </button>`;
+
+    // 末页按钮
+    html += `<button class="pagination-btn" onclick="changeProductsPage(${totalPages})" ${page === totalPages || totalPages <= 1 ? 'disabled' : ''}>
+        末页
+    </button>`;
+
+    // 添加页码跳转输入框
+    if (totalPages > 0) {
         html += `
             <div class="page-jump">
                 <span>跳转到</span>
@@ -3074,58 +3076,59 @@ function updateOrdersPagination() {
 
     let html = '';
 
-    if (totalPages > 1) {
-        // 首页按钮
-        html += `<button class="pagination-btn" onclick="changeOrdersPage(1)" ${page === 1 ? 'disabled' : ''}>
-            首页
-        </button>`;
+    // 始终显示分页控件，保持UI一致性
+    // 首页按钮
+    html += `<button class="pagination-btn" onclick="changeOrdersPage(1)" ${page === 1 || totalPages <= 1 ? 'disabled' : ''}>
+        首页
+    </button>`;
 
-        // 上一页按钮
-        html += `<button class="pagination-btn" onclick="changeOrdersPage(${page - 1})" ${page === 1 ? 'disabled' : ''}>
-            上一页
-        </button>`;
+    // 上一页按钮
+    html += `<button class="pagination-btn" onclick="changeOrdersPage(${page - 1})" ${page === 1 || totalPages <= 1 ? 'disabled' : ''}>
+        上一页
+    </button>`;
 
-        // 页码显示逻辑
-        let startPage = Math.max(1, page - 2);
-        let endPage = Math.min(totalPages, page + 2);
+    // 页码显示逻辑
+    let startPage = Math.max(1, page - 2);
+    let endPage = Math.min(totalPages, page + 2);
 
-        // 如果总页数很多，显示省略号
-        if (totalPages > 5) {
-            if (startPage > 1) {
-                html += `<button class="pagination-btn" onclick="changeOrdersPage(1)">1</button>`;
-                if (startPage > 2) {
-                    html += `<span class="pagination-ellipsis">...</span>`;
-                }
-            }
-
-            for (let i = startPage; i <= endPage; i++) {
-                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeOrdersPage(${i})">${i}</button>`;
-            }
-
-            if (endPage < totalPages) {
-                if (endPage < totalPages - 1) {
-                    html += `<span class="pagination-ellipsis">...</span>`;
-                }
-                html += `<button class="pagination-btn" onclick="changeOrdersPage(${totalPages})">${totalPages}</button>`;
-            }
-        } else {
-            // 总页数较少，显示所有页码
-            for (let i = 1; i <= totalPages; i++) {
-                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeOrdersPage(${i})">${i}</button>`;
+    // 如果总页数很多，显示省略号
+    if (totalPages > 5) {
+        if (startPage > 1) {
+            html += `<button class="pagination-btn" onclick="changeOrdersPage(1)">1</button>`;
+            if (startPage > 2) {
+                html += `<span class="pagination-ellipsis">...</span>`;
             }
         }
 
-        // 下一页按钮
-        html += `<button class="pagination-btn" onclick="changeOrdersPage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>
-            下一页
-        </button>`;
+        for (let i = startPage; i <= endPage; i++) {
+            html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeOrdersPage(${i})">${i}</button>`;
+        }
 
-        // 末页按钮
-        html += `<button class="pagination-btn" onclick="changeOrdersPage(${totalPages})" ${page === totalPages ? 'disabled' : ''}>
-            末页
-        </button>`;
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+            html += `<button class="pagination-btn" onclick="changeOrdersPage(${totalPages})">${totalPages}</button>`;
+        }
+    } else {
+        // 总页数较少，显示所有页码
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeOrdersPage(${i})">${i}</button>`;
+        }
+    }
 
-        // 添加页码跳转输入框
+    // 下一页按钮
+    html += `<button class="pagination-btn" onclick="changeOrdersPage(${page + 1})" ${page === totalPages || totalPages <= 1 ? 'disabled' : ''}>
+        下一页
+    </button>`;
+
+    // 末页按钮
+    html += `<button class="pagination-btn" onclick="changeOrdersPage(${totalPages})" ${page === totalPages || totalPages <= 1 ? 'disabled' : ''}>
+        末页
+    </button>`;
+
+    // 添加页码跳转输入框
+    if (totalPages > 0) {
         html += `
             <div class="page-jump">
                 <span>跳转到</span>
@@ -3196,58 +3199,59 @@ function updateCategoriesPagination() {
 
     let html = '';
 
-    if (totalPages > 1) {
-        // 首页按钮
-        html += `<button class="pagination-btn" onclick="changeCategoriesPage(1)" ${page === 1 ? 'disabled' : ''}>
-            首页
-        </button>`;
+    // 始终显示分页控件，保持UI一致性
+    // 首页按钮
+    html += `<button class="pagination-btn" onclick="changeCategoriesPage(1)" ${page === 1 || totalPages <= 1 ? 'disabled' : ''}>
+        首页
+    </button>`;
 
-        // 上一页按钮
-        html += `<button class="pagination-btn" onclick="changeCategoriesPage(${page - 1})" ${page === 1 ? 'disabled' : ''}>
-            上一页
-        </button>`;
+    // 上一页按钮
+    html += `<button class="pagination-btn" onclick="changeCategoriesPage(${page - 1})" ${page === 1 || totalPages <= 1 ? 'disabled' : ''}>
+        上一页
+    </button>`;
 
-        // 页码显示逻辑
-        let startPage = Math.max(1, page - 2);
-        let endPage = Math.min(totalPages, page + 2);
+    // 页码显示逻辑
+    let startPage = Math.max(1, page - 2);
+    let endPage = Math.min(totalPages, page + 2);
 
-        // 如果总页数很多，显示省略号
-        if (totalPages > 5) {
-            if (startPage > 1) {
-                html += `<button class="pagination-btn" onclick="changeCategoriesPage(1)">1</button>`;
-                if (startPage > 2) {
-                    html += `<span class="pagination-ellipsis">...</span>`;
-                }
-            }
-
-            for (let i = startPage; i <= endPage; i++) {
-                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeCategoriesPage(${i})">${i}</button>`;
-            }
-
-            if (endPage < totalPages) {
-                if (endPage < totalPages - 1) {
-                    html += `<span class="pagination-ellipsis">...</span>`;
-                }
-                html += `<button class="pagination-btn" onclick="changeCategoriesPage(${totalPages})">${totalPages}</button>`;
-            }
-        } else {
-            // 总页数较少，显示所有页码
-            for (let i = 1; i <= totalPages; i++) {
-                html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeCategoriesPage(${i})">${i}</button>`;
+    // 如果总页数很多，显示省略号
+    if (totalPages > 5) {
+        if (startPage > 1) {
+            html += `<button class="pagination-btn" onclick="changeCategoriesPage(1)">1</button>`;
+            if (startPage > 2) {
+                html += `<span class="pagination-ellipsis">...</span>`;
             }
         }
 
-        // 下一页按钮
-        html += `<button class="pagination-btn" onclick="changeCategoriesPage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>
-            下一页
-        </button>`;
+        for (let i = startPage; i <= endPage; i++) {
+            html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeCategoriesPage(${i})">${i}</button>`;
+        }
 
-        // 末页按钮
-        html += `<button class="pagination-btn" onclick="changeCategoriesPage(${totalPages})" ${page === totalPages ? 'disabled' : ''}>
-            末页
-        </button>`;
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+            html += `<button class="pagination-btn" onclick="changeCategoriesPage(${totalPages})">${totalPages}</button>`;
+        }
+    } else {
+        // 总页数较少，显示所有页码
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<button class="pagination-btn ${i === page ? 'active' : ''}" onclick="changeCategoriesPage(${i})">${i}</button>`;
+        }
+    }
 
-        // 添加页码跳转输入框
+    // 下一页按钮
+    html += `<button class="pagination-btn" onclick="changeCategoriesPage(${page + 1})" ${page === totalPages || totalPages <= 1 ? 'disabled' : ''}>
+        下一页
+    </button>`;
+
+    // 末页按钮
+    html += `<button class="pagination-btn" onclick="changeCategoriesPage(${totalPages})" ${page === totalPages || totalPages <= 1 ? 'disabled' : ''}>
+        末页
+    </button>`;
+
+    // 添加页码跳转输入框
+    if (totalPages > 0) {
         html += `
             <div class="page-jump">
                 <span>跳转到</span>
