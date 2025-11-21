@@ -2916,6 +2916,10 @@ function showReferralLinkModal(data) {
     document.getElementById('referral-base-url').value = data.baseUrl;
     document.getElementById('referral-link-code').value = data.linkCode;
     document.getElementById('referral-full-template').value = data.template;
+    const signedApiElem = document.getElementById('referral-signed-api');
+    if (signedApiElem) {
+        signedApiElem.value = data.signedLinkApi || '';
+    }
     
     modal.style.display = 'flex';
 }

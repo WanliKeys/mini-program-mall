@@ -33,17 +33,20 @@ router.post('/', adminAuth, asyncHandler(async (req, res) => {
       'INSERT INTO referral_links (product_id, link_code) VALUES (?, ?)',
       [productId, linkCode]
     );
-    
-    // 生成完整链接模板
-    const baseUrl = `${process.env.FRONTEND_URL || 'https://yourdomain.com'}/product/detail`;
-    const template = `${baseUrl}?link=${linkCode}&order={引流方订单号}&notify={通知地址}`;
+
+    const landingBase = process.env.REFERRAL_LANDING_URL || 'https://jxxcfwlkj.cn/referral-jump.html';
+    const publicApiBase = process.env.PUBLIC_API_BASE || process.env.API_BASE_URL || 'https://jxxcfwlkj.cn/api';
+    const baseUrl = `${landingBase}?productId=${productId}&linkCode=${linkCode}`;
+    const template = `${baseUrl}&partnerOrderNo={引流方订单号}&notifyUrl={通知地址(需URL编码)}&externalOrderNo={可选外部订单号}`;
     
     success(res, {
       linkCode,
       baseUrl,
       template,
       productName: product.name,
-      price: product.price
+      price: product.price,
+      landingBase,
+      signedLinkApi: `${publicApiBase.replace(/\/$/, '')}/referral/signed-link`
     }, '引流链接生成成功');
     
   } catch (err) {

@@ -37,37 +37,70 @@
 <body>
     <!-- 登录页面 -->
     <div id="login-page" class="login-container">
-        <div class="login-card">
-            <div class="login-header">
-                <div class="logo">
-                    <i class="bi bi-shop"></i>
-                    <span>商城管理系统</span>
-                </div>
-                <p class="login-subtitle">专业的电商管理解决方案</p>
-            </div>
-            <form id="login-form" class="login-form">
-                <div class="form-group">
-                    <label for="username" class="form-label">用户名</label>
-                    <div class="input-group">
-                        <i class="bi bi-person input-icon"></i>
-                        <input type="text" class="form-control" id="username" placeholder="请输入用户名" required>
+        <!-- 装饰元素 -->
+        <div class="decorative-orbs">
+            <div class="orb orb-1"></div>
+            <div class="orb orb-2"></div>
+            <div class="orb orb-3"></div>
+        </div>
+
+        <div class="login-wrapper">
+            <div class="login-card glass-effect">
+                <div class="login-header">
+                    <div class="logo-container">
+                        <div class="logo-icon">
+                            <i class="bi bi-shop"></i>
+                        </div>
+                        <div class="logo-text">
+                            <h1 class="logo-title">商城管理平台</h1>
+                            <!-- <p class="logo-subtitle">商城管理平台</p> -->
+                        </div>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="password" class="form-label">密码</label>
-                    <div class="input-group">
-                        <i class="bi bi-lock input-icon"></i>
-                        <input type="password" class="form-control" id="password" placeholder="请输入密码" required>
+
+                <form id="login-form" class="login-form">
+                    <div class="form-group">
+                        <label for="username" class="form-label">用户名</label>
+                        <div class="input-wrapper">
+                            <i class="bi bi-person input-icon"></i>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="username"
+                                placeholder="输入用户名"
+                                required
+                                autocomplete="username"
+                            >
+                            <div class="input-border"></div>
+                        </div>
                     </div>
-                </div>
-                <button type="submit" class="btn btn-primary btn-login">
-                    <i class="bi bi-box-arrow-in-right"></i>
-                    登录系统
-                </button>
+
+                    <div class="form-group">
+                        <label for="password" class="form-label">密码</label>
+                        <div class="input-wrapper">
+                            <i class="bi bi-lock input-icon"></i>
+                            <input
+                                type="password"
+                                class="form-control"
+                                id="password"
+                                placeholder="输入密码"
+                                required
+                                autocomplete="current-password"
+                            >
+                            <div class="input-border"></div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-login">
+                        <span class="btn-text">进入系统</span>
+                        <i class="bi bi-arrow-right btn-icon"></i>
+                    </button>
+                </form>
+
                 <div class="login-footer">
-                    <small class="text-muted">默认账号: admin / admin123</small>
+                    <p class="footer-text">©专业的电商管理解决方案</p>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 
@@ -1049,16 +1082,21 @@
                         </button>
                     </div>
                 </div>
+
+                <div class="form-group">
+                    <label>签名链接接口（POST）</label>
+                    <input type="text" id="referral-signed-api" class="form-control" readonly>
+                </div>
                 
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i>
                     <div>
                         <strong>使用说明：</strong>
                         <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-                            <li>将完整链接模板提供给引流方</li>
-                            <li>引流方需要替换 {引流方订单号} 为实际订单号</li>
-                            <li>引流方需要替换 {通知地址} 为实际的通知URL</li>
-                            <li>最终链接格式：<code>基础链接?link=链接码&order=实际订单号&notify=实际通知地址</code></li>
+                            <li>引流方替换模板中的 {引流方订单号}/{通知地址}/{可选外部订单号}</li>
+                            <li>引流方调用上方接口生成最终的 signedUrl（POST 参数：linkCode、partnerOrderNo、notifyUrl、externalOrderNo、env）</li>
+                            <li>接口响应的 signedUrl 直接用于 H5，落地页会自动调起小程序</li>
+                            <li>notifyUrl 需 URL 编码，env 可选 trial/release，默认为 release</li>
                         </ul>
                     </div>
                 </div>

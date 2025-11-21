@@ -76,10 +76,8 @@
     <div class="jump-container">
         <div class="loading"></div>
         <div class="title">正在跳转到小程序</div>
-        <div class="subtitle">请稍候，即将进入商城...</div>
-        <div id="errorMsg" class="error" style="display: none;">
-            跳转失败，请确保在微信环境中打开
-        </div>
+        <div class="subtitle">请在微信内打开，稍候自动跳转</div>
+        <div id="errorMsg" class="error" style="display: none;"></div>
         <button id="retryBtn" class="retry-btn" style="display: none;" onclick="retryJump()">
             重新跳转
         </button>
@@ -87,106 +85,110 @@
 
     <script src="https://res.wx.qq.com/open/js/jweixin-1.6.0.js"></script>
     <script>
-        // 从URL参数获取引流信息
-        function getUrlParams() {
-            const params = {};
+        const state = { params: null, jsSdkReady: false };
+
+        function getQueryParams() {
             const urlParams = new URLSearchParams(window.location.search);
-
-            // 必需参数
-            params.appId = urlParams.get('appId') || 'wx0b1ce2aa786ec457';
-            params.productId = urlParams.get('productId');
-            params.linkCode = urlParams.get('linkCode');
-            params.partnerOrderNo = urlParams.get('partnerOrderNo');
-            params.notifyUrl = urlParams.get('notifyUrl');
-
-            // 可选参数
-            params.externalOrderNo = urlParams.get('externalOrderNo');
-
-            return params;
+            return {
+                appId: urlParams.get('appId') || 'wx0b1ce2aa786ec457',
+                productId: urlParams.get('productId'),
+                linkCode: urlParams.get('linkCode'),
+                partnerOrderNo: urlParams.get('partnerOrderNo'),
+                notifyUrl: urlParams.get('notifyUrl'),
+                externalOrderNo: urlParams.get('externalOrderNo'),
+                envVersion: urlParams.get('env') || 'release'
+            };
         }
 
-        // 构建小程序路径
-        function buildMiniProgramPath(params) {
-            let path;
-            const queryParams = [];
+        function getHashParams() {
+            if (!window.location.hash) return {};
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            return {
+                timestamp: hashParams.get('timestamp') || hashParams.get('ts'),
+                nonceStr: hashParams.get('nonceStr') || hashParams.get('nonce'),
+                signature: hashParams.get('signature') || hashParams.get('sig'),
+                appId: hashParams.get('appId') || hashParams.get('appid')
+            };
+        }
 
-            // 根据是否有商品ID决定跳转页面
+        function getAllParams() {
+            return { ...getQueryParams(), ...getHashParams() };
+        }
+
+        function buildMiniProgramPath(params) {
+            const queryParams = [];
+            let path = 'pages/index/index';
+
             if (params.productId) {
                 path = 'pages/product/detail/detail';
                 queryParams.push(`id=${params.productId}`);
-            } else {
-                path = 'pages/index/index'; // 跳转到首页
             }
-
             if (params.linkCode) queryParams.push(`link=${params.linkCode}`);
             if (params.partnerOrderNo) queryParams.push(`order=${params.partnerOrderNo}`);
             if (params.notifyUrl) queryParams.push(`notify=${encodeURIComponent(params.notifyUrl)}`);
             if (params.externalOrderNo) queryParams.push(`external_order_no=${params.externalOrderNo}`);
 
-            if (queryParams.length > 0) {
-                path += '?' + queryParams.join('&');
-            }
-
-            return path;
+            return queryParams.length ? `${path}?${queryParams.join('&')}` : path;
         }
 
-        // 跳转到小程序
+        function initSdk(params) {
+            if (!params.signature || !params.timestamp || !params.nonceStr) {
+                showError('缺少微信签名参数，请检查链接');
+                return Promise.reject(new Error('missing params'));
+            }
+
+            return new Promise((resolve, reject) => {
+                wx.config({
+                    debug: false,
+                    appId: params.appId,
+                    timestamp: Number(params.timestamp),
+                    nonceStr: params.nonceStr,
+                    signature: params.signature,
+                    jsApiList: ['checkJsApi', 'miniProgram', 'navigateToMiniProgram']
+                });
+
+                wx.ready(() => {
+                    state.jsSdkReady = true;
+                    resolve();
+                });
+
+                wx.error(err => {
+                    showError('微信鉴权失败：' + err.errMsg);
+                    reject(err);
+                });
+            });
+        }
+
         function jumpToMiniProgram() {
-            const logMsg = '开始跳转小程序...';
-            console.log(logMsg);
-            sendLogToServer(logMsg);
-            const params = getUrlParams();
+            if (!state.params) state.params = getAllParams();
 
-            const paramMsg = 'URL参数: ' + JSON.stringify(params);
-            console.log(paramMsg);
-            // sendLogToServer(paramMsg);
-
-            // 验证必需参数（简化版本）
-            if (!params.productId) {
-                console.log('没有商品ID，跳转到首页');
-                // 没有商品ID时跳转到首页
-                params.productId = null;
-                params.linkCode = params.linkCode || 'TEST'; // 默认测试码
-            }
-
-            if (!params.linkCode) {
-                params.linkCode = 'TEST'; // 默认测试码
-            }
-
-            // 检查是否在微信环境中
-            if (typeof wx === 'undefined') {
-                showError('请在微信环境中打开此链接');
+            if (!/MicroMessenger/i.test(navigator.userAgent)) {
+                showError('当前环境无法调起小程序，请在微信内打开此链接');
                 return;
             }
 
-            const path = buildMiniProgramPath(params);
+            if (typeof wx === 'undefined' || !wx.miniProgram) {
+                showError('微信JS-SDK未就绪，请在微信内打开');
+                return;
+            }
 
-            console.log('准备跳转，参数:', {
-                appId: params.appId,
-                path: path,
-                envVersion: 'release'
+            const targetPath = buildMiniProgramPath(state.params);
+            console.log('准备跳转', {
+                appId: state.params.appId,
+                path: targetPath,
+                envVersion: state.params.envVersion
             });
 
-            wx.navigateToMiniProgram({
-                appId: params.appId,
-                path: path,
-                extraData: {
-                    source: 'referral',
-                    timestamp: Date.now()
-                },
-                envVersion: 'trial', // 使用体验版
-                success: function(res) {
-                    console.log('✅ 跳转成功:', res);
-                },
-                fail: function(err) {
-                    console.error('❌ 跳转失败:', err);
-                    console.error('错误详情:', JSON.stringify(err));
-                    showError('跳转失败: ' + err.errMsg);
+            wx.miniProgram.navigateTo({
+                url: `/${targetPath}`,
+                success: res => console.log('✅ 跳转成功', res),
+                fail: err => {
+                    console.error('❌ 跳转失败', err);
+                    showError('跳转失败：' + err.errMsg);
                 }
             });
         }
 
-        // 显示错误信息
         function showError(message) {
             document.getElementById('errorMsg').textContent = message;
             document.getElementById('errorMsg').style.display = 'block';
@@ -194,51 +196,70 @@
             document.querySelector('.loading').style.display = 'none';
         }
 
-        // 重试跳转
+        function showCopyGuide() {
+            const container = document.querySelector('.jump-container');
+            const url = window.location.href;
+            container.innerHTML = `
+                <div class="title">请在微信中打开</div>
+                <div class="subtitle">复制下方链接到微信聊天窗口，或发送给朋友后点击即可进入小程序</div>
+                <div style="word-break: break-all; background: rgba(255,255,255,0.15); padding: 12px; border-radius: 12px;">${url}</div>
+                <button class="retry-btn" style="margin-top:24px;" onclick="copyCurrentLink()">复制链接</button>
+                <div style="margin-top:16px; font-size:14px; opacity:0.8;">复制完成后，打开微信 → 粘贴到聊天框 → 点击链接即可继续支付</div>
+            `;
+        }
+
+        function copyCurrentLink() {
+            const text = window.location.href;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('链接已复制，请到微信中粘贴并打开');
+                }).catch(() => fallbackCopy(text));
+            } else {
+                fallbackCopy(text);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert('链接已复制，请到微信中粘贴并打开');
+        }
+
         function retryJump() {
             document.getElementById('errorMsg').style.display = 'none';
             document.getElementById('retryBtn').style.display = 'none';
             document.querySelector('.loading').style.display = 'block';
-            jumpToMiniProgram();
+            start();
         }
 
-        // 发送日志到服务器
-        // function sendLogToServer(logData) {
-        //     fetch('https://jxxcfwlkj.cn/api/log/jump', {
-        //         method: 'POST',
-        //         headers: {
-        //             'Content-Type': 'application/json'
-        //         },
-        //         body: JSON.stringify({
-        //             timestamp: new Date().toISOString(),
-        //             userAgent: navigator.userAgent,
-        //             log: logData
-        //         })
-        //     }).catch(err => {
-        //         console.log('发送日志失败:', err);
-        //     });
-        // }
+        async function start() {
+            state.params = getAllParams();
+            console.log('URL 参数', state.params);
 
-    // 页面加载完成后自动跳转
-        window.onload = function() {
-            const logMsg = '页面加载完成，微信JS-SDK状态: ' + typeof wx;
-            console.log(logMsg);
-            // sendLogToServer(logMsg); // 临时禁用日志
-
-            if (typeof wx !== 'undefined') {
-                console.log('微信JS-SDK已加载');
-                // sendLogToServer('微信JS-SDK已加载');
-            } else {
-                const errorMsg = '微信JS-SDK未加载，请在微信环境中打开';
-                console.error(errorMsg);
-                // sendLogToServer(errorMsg);
-                showError('微信JS-SDK未加载，请在微信环境中打开');
+            if (!state.params.linkCode) {
+                showError('缺少 linkCode 参数');
                 return;
             }
 
-            // 延迟500ms确保微信JS-SDK加载完成
-            setTimeout(jumpToMiniProgram, 500);
-        };
+            const isWechat = /MicroMessenger/i.test(navigator.userAgent);
+            if (!isWechat) {
+                showCopyGuide();
+                return;
+            }
+
+            try {
+                await initSdk(state.params);
+                jumpToMiniProgram();
+            } catch (err) {
+                console.error('初始化失败', err);
+            }
+        }
+
+        window.onload = start;
     </script>
 </body>
 </html>
