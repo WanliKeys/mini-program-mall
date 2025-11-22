@@ -918,43 +918,10 @@ async function notifyReferralPartner(order, payment) {
 
     const referralOrder = referralOrders[0];
 
-    // 获取订单的卡密信息
-    let cardCodes = [];
-    try {
-      const cardRecords = await query(
-        `SELECT cc.code
-         FROM card_codes cc
-         JOIN order_card_cards occ ON cc.id = occ.card_code_id
-         WHERE occ.order_id = ? AND cc.status = 'shipped'
-         ORDER BY cc.id`,
-        [order.id]
-      );
-
-      // 如果没有找到order_card_cards表，尝试从orders表直接关联
-      if (cardRecords.length === 0) {
-        const directCardRecords = await query(
-          `SELECT cc.code
-           FROM card_codes cc
-           WHERE cc.id = (SELECT card_code_id FROM orders WHERE id = ?)
-             AND cc.status = 'shipped'`,
-          [order.id]
-        );
-        cardCodes = directCardRecords.map(record => record.code);
-      } else {
-        cardCodes = cardRecords.map(record => record.code);
-      }
-
-      console.log(`获取到订单 ${order.id} 的卡密数量: ${cardCodes.length}`);
-    } catch (cardError) {
-      console.warn('获取卡密信息失败:', cardError.message);
-      // 卡密获取失败不影响主通知流程
-    }
-
     const notifyData = {
       orderNo: referralOrder.partner_order_no,
       amount: parseFloat(order.total_amount),
-      status: 'paid',
-      cardCodes: cardCodes  // 新增卡密数组字段
+      status: 'paid'
     };
 
     // 调用带重试机制的通知函数
