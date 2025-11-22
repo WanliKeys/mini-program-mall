@@ -13,16 +13,11 @@ const miniProgramTokenCache = {
 
 function buildMiniProgramPath(params) {
   const queryParams = [];
-  let path = 'pages/index/index';
+  const path = 'pages/index/index';
 
-  if (params.productId) {
-    path = 'pages/product/detail/detail';
-    queryParams.push(`id=${params.productId}`);
-  }
-  if (params.linkCode) queryParams.push(`link=${params.linkCode}`);
   if (params.partnerOrderNo) queryParams.push(`order=${params.partnerOrderNo}`);
   if (params.notifyUrl) queryParams.push(`notify=${encodeURIComponent(params.notifyUrl)}`);
-  if (params.externalOrderNo) queryParams.push(`external_order_no=${params.externalOrderNo}`);
+  if (params.price) queryParams.push(`price=${params.price}`);
 
   return queryParams.length ? `${path}?${queryParams.join('&')}` : path;
 }
@@ -368,53 +363,32 @@ router.post('/signed-link', asyncHandler(async (req, res) => {
  */
 router.post('/url-link', asyncHandler(async (req, res) => {
   const {
-    linkCode,
     partnerOrderNo,
     notifyUrl,
-    externalOrderNo,
-    env = 'release',
-    expireInterval
+    price
   } = req.body || {};
 
-  if (!linkCode || !partnerOrderNo || !notifyUrl) {
-    return error(res, '参数不完整，必须包含 linkCode/partnerOrderNo/notifyUrl', 400);
+  if (!partnerOrderNo || !notifyUrl) {
+    return error(res, '参数不完整，必须包含 partnerOrderNo/notifyUrl', 400);
   }
-
-  if (expireInterval && (Number.isNaN(Number(expireInterval)) || Number(expireInterval) <= 0)) {
-    return error(res, 'expireInterval 必须为正整数（秒）', 400);
-  }
-
-  // 验证引流链接有效，获取 product_id
-  const links = await query(
-    'SELECT * FROM referral_links WHERE link_code = ? AND status = "active" LIMIT 1',
-    [linkCode]
-  );
-  if (links.length === 0) {
-    return error(res, '引流链接不存在或已失效', 404);
-  }
-  const link = links[0];
 
   const miniProgramPath = buildMiniProgramPath({
-    productId: link.product_id,
-    linkCode,
     partnerOrderNo,
     notifyUrl,
-    externalOrderNo
+    price
   });
 
   try {
     const urlLink = await generateUrlLink({
       path: miniProgramPath.split('?')[0],
       queryString: miniProgramPath.includes('?') ? miniProgramPath.split('?')[1] : '',
-      envVersion: env,
-      expireInterval: expireInterval ? Number(expireInterval) : undefined
+      envVersion: 'release'
     });
 
     success(res, {
       urlLink,
       path: miniProgramPath.split('?')[0],
-      query: miniProgramPath.includes('?') ? miniProgramPath.split('?')[1] : '',
-      env
+      query: miniProgramPath.includes('?') ? miniProgramPath.split('?')[1] : ''
     }, '生成 URL Link 成功');
   } catch (err) {
     console.error('生成 URL Link 失败:', err.message || err);

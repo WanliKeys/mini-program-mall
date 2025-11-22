@@ -243,6 +243,9 @@ app.get('/api/admin/referral-links/product/:productId', (req, res) => proxyReque
 app.post('/api/admin/referral-links', (req, res) => proxyRequest(req, res, '/admin/referral-links', 'POST', req.body));
 app.put('/api/admin/referral-links/:id/status', (req, res) => proxyRequest(req, res, `/admin/referral-links/${req.params.id}/status`, 'PUT', req.body));
 app.delete('/api/admin/referral-links/:id', (req, res) => proxyRequest(req, res, `/admin/referral-links/${req.params.id}`, 'DELETE'));
+
+// URL Link 生成（透传到后端）
+app.post('/api/referral/url-link', (req, res) => proxyRequest(req, res, '/referral/url-link', 'POST', req.body));
 app.delete('/api/admin/card-codes/batch', (req, res) => {
   console.log('批量删除请求体:', req.body);
   console.log('请求头:', req.headers);

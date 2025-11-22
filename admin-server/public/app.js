@@ -2920,6 +2920,12 @@ function showReferralLinkModal(data) {
     if (signedApiElem) {
         signedApiElem.value = data.signedLinkApi || '';
     }
+    // 给引流方示例占位值，真实落地由引流方替换
+    document.getElementById('referral-partner-order-no').value = `ORDER_FAKE_${Date.now()}`;
+    document.getElementById('referral-notify-url').value = 'https://example.com/notify';
+    document.getElementById('referral-price').value = currentReferralProduct.price || '';
+    document.getElementById('referral-url-link').value = '';
+    document.getElementById('referral-url-link-status').textContent = '';
     
     modal.style.display = 'flex';
 }
@@ -2932,6 +2938,69 @@ function hideReferralLinkModal() {
 }
 
 // ==================== 商品分页功能 ====================
+
+// 生成 URL Link（永久）
+async function generateUrlLinkForReferral() {
+    const partnerOrderNo = document.getElementById('referral-partner-order-no').value.trim();
+    const notifyUrlRaw = document.getElementById('referral-notify-url').value.trim();
+    const price = document.getElementById('referral-price').value.trim();
+    const statusEl = document.getElementById('referral-url-link-status');
+    const outputEl = document.getElementById('referral-url-link');
+
+    if (!partnerOrderNo) return showMessage('请填写引流方订单号', 'error');
+    if (!notifyUrlRaw) return showMessage('请填写通知地址', 'error');
+    if (!price) return showMessage('请填写价格', 'error');
+
+    try {
+        statusEl.textContent = '生成中...';
+        outputEl.value = '';
+
+        const notifyUrlEncoded = encodeURIComponent(notifyUrlRaw);
+
+        const payload = {
+            partnerOrderNo,
+            notifyUrl: notifyUrlEncoded,
+            price
+        };
+
+        const resp = await fetch(`${API_BASE}/referral/url-link`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        if (!data.success) {
+            throw new Error(data.message || '生成 URL Link 失败');
+        }
+
+        outputEl.value = data.data.urlLink || '';
+        statusEl.textContent = '生成成功（永久链接）';
+        showMessage('URL Link 生成成功', 'success');
+    } catch (err) {
+        console.error('生成 URL Link 失败', err);
+        statusEl.textContent = '生成失败';
+        showMessage(err.message || '生成 URL Link 失败', 'error');
+    }
+}
+
+function copyReferralUrlLink() {
+    const url = document.getElementById('referral-url-link').value;
+    if (!url) {
+        showMessage('暂无可复制的 URL Link', 'warning');
+        return;
+    }
+    navigator.clipboard?.writeText(url).then(() => {
+        showMessage('已复制 URL Link', 'success');
+    }).catch(() => {
+        const textarea = document.createElement('textarea');
+        textarea.value = url;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showMessage('已复制 URL Link', 'success');
+    });
+}
 
 // 更新商品分页
 function updateProductsPagination() {
