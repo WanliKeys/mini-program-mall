@@ -13,13 +13,16 @@ const miniProgramTokenCache = {
 
 function buildMiniProgramPath(params) {
   const queryParams = [];
-  const path = 'pages/index/index';
+  const path = 'pages/order/confirm/confirm';
 
-  if (params.partnerOrderNo) queryParams.push(`order=${params.partnerOrderNo}`);
-  if (params.notifyUrl) queryParams.push(`notify=${encodeURIComponent(params.notifyUrl)}`);
-  if (params.price) queryParams.push(`price=${params.price}`);
+  queryParams.push(`isReferral=true`);
+  if (params.productId) queryParams.push(`productId=${params.productId}`);
+  if (params.linkCode) queryParams.push(`linkCode=${params.linkCode}`);
+  if (params.partnerOrderNo) queryParams.push(`partnerOrderNo=${params.partnerOrderNo}`);
+  if (params.notifyUrl) queryParams.push(`notifyUrl=${encodeURIComponent(params.notifyUrl)}`);
+  queryParams.push(`quantity=${params.quantity || 1}`);
 
-  return queryParams.length ? `${path}?${queryParams.join('&')}` : path;
+  return `${path}?${queryParams.join('&')}`;
 }
 
 async function generateSignedLandingUrl(link, {
@@ -363,19 +366,31 @@ router.post('/signed-link', asyncHandler(async (req, res) => {
  */
 router.post('/url-link', asyncHandler(async (req, res) => {
   const {
+    linkCode,
     partnerOrderNo,
-    notifyUrl,
-    price
+    notifyUrl
   } = req.body || {};
 
-  if (!partnerOrderNo || !notifyUrl) {
-    return error(res, '参数不完整，必须包含 partnerOrderNo/notifyUrl', 400);
+  if (!linkCode || !partnerOrderNo || !notifyUrl) {
+    return error(res, '参数不完整，必须包含 linkCode/partnerOrderNo/notifyUrl', 400);
   }
 
+  // 通过 linkCode 获取商品
+  const links = await query(
+    'SELECT product_id FROM referral_links WHERE link_code = ? AND status = "active" LIMIT 1',
+    [linkCode]
+  );
+  if (links.length === 0) {
+    return error(res, '引流链接不存在或已失效', 404);
+  }
+  const productId = links[0].product_id;
+
   const miniProgramPath = buildMiniProgramPath({
+    productId,
+    linkCode,
     partnerOrderNo,
     notifyUrl,
-    price
+    quantity: 1
   });
 
   try {

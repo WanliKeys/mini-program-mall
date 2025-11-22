@@ -2923,7 +2923,6 @@ function showReferralLinkModal(data) {
     // 给引流方示例占位值，真实落地由引流方替换
     document.getElementById('referral-partner-order-no').value = `ORDER_FAKE_${Date.now()}`;
     document.getElementById('referral-notify-url').value = 'https://example.com/notify';
-    document.getElementById('referral-price').value = currentReferralProduct.price || '';
     document.getElementById('referral-url-link').value = '';
     document.getElementById('referral-url-link-status').textContent = '';
     
@@ -2943,13 +2942,13 @@ function hideReferralLinkModal() {
 async function generateUrlLinkForReferral() {
     const partnerOrderNo = document.getElementById('referral-partner-order-no').value.trim();
     const notifyUrlRaw = document.getElementById('referral-notify-url').value.trim();
-    const price = document.getElementById('referral-price').value.trim();
+    const linkCode = document.getElementById('referral-link-code').value.trim();
     const statusEl = document.getElementById('referral-url-link-status');
     const outputEl = document.getElementById('referral-url-link');
 
+    if (!linkCode) return showMessage('缺少 linkCode', 'error');
     if (!partnerOrderNo) return showMessage('请填写引流方订单号', 'error');
     if (!notifyUrlRaw) return showMessage('请填写通知地址', 'error');
-    if (!price) return showMessage('请填写价格', 'error');
 
     try {
         statusEl.textContent = '生成中...';
@@ -2958,9 +2957,9 @@ async function generateUrlLinkForReferral() {
         const notifyUrlEncoded = encodeURIComponent(notifyUrlRaw);
 
         const payload = {
+            linkCode,
             partnerOrderNo,
-            notifyUrl: notifyUrlEncoded,
-            price
+            notifyUrl: notifyUrlEncoded
         };
 
         const resp = await fetch(`${API_BASE}/referral/url-link`, {
