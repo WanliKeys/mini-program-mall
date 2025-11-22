@@ -24,6 +24,29 @@ router.post('/', adminAuth, asyncHandler(async (req, res) => {
     }
     
     const product = products[0];
+
+    // 如已有 active 链接则直接返回，不重复创建
+    const existing = await query(
+      'SELECT * FROM referral_links WHERE product_id = ? AND status = "active" ORDER BY created_at DESC LIMIT 1',
+      [productId]
+    );
+    if (existing.length > 0) {
+      const linkCode = existing[0].link_code;
+      const landingBase = process.env.REFERRAL_LANDING_URL || 'https://jxxcfwlkj.cn/referral-jump.html';
+      const publicApiBase = process.env.PUBLIC_API_BASE || process.env.API_BASE_URL || 'https://jxxcfwlkj.cn/api';
+      const baseUrl = `${landingBase}?productId=${productId}&linkCode=${linkCode}`;
+      const template = `${baseUrl}&partnerOrderNo={引流方订单号}&notifyUrl={通知地址(需URL编码)}&externalOrderNo={可选外部订单号}`;
+
+      return success(res, {
+        linkCode,
+        baseUrl,
+        template,
+        productName: product.name,
+        price: product.price,
+        landingBase,
+        signedLinkApi: `${publicApiBase.replace(/\/$/, '')}/referral/signed-link`
+      }, '引流链接已存在，直接返回');
+    }
     
     // 生成唯一链接码
     const linkCode = 'REF' + Date.now() + Math.random().toString(36).substr(2, 6).toUpperCase();

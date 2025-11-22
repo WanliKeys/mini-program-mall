@@ -2880,23 +2880,50 @@ async function generateReferralLink(productId) {
         }
         
         currentReferralProduct = productData.data;
-        
-        // 生成引流链接
-        const response = await fetch(`${API_BASE}/admin/referral-links`, {
-            method: 'POST',
+
+        // 先尝试获取已存在的引流链接
+        let linkData = null;
+        const listResp = await fetch(`${API_BASE}/admin/referral-links/product/${productId}`, {
             headers: {
                 'Authorization': `Bearer ${currentToken}`,
                 'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ productId: productId })
+            }
         });
+        if (listResp.ok) {
+            const listJson = await listResp.json();
+            if (listJson.success && Array.isArray(listJson.data) && listJson.data.length > 0) {
+                // 优先取第一个 active 的，否则取最新一条
+                const active = listJson.data.find(item => item.status === 'active');
+                linkData = active || listJson.data[0];
+            }
+        }
         
-        const data = await response.json();
+        // 生成引流链接
+        let data = null;
+        if (linkData) {
+            data = {
+                success: true,
+                data: {
+                    linkCode: linkData.link_code
+                }
+            };
+        } else {
+            const response = await fetch(`${API_BASE}/admin/referral-links`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${currentToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ productId: productId })
+            });
+            
+            data = await response.json();
+        }
         
-        if (data.success) {
+        if (data && data.success) {
             showReferralLinkModal(data.data);
         } else {
-            throw new Error(data.message || '生成引流链接失败');
+            throw new Error((data && data.message) || '生成引流链接失败');
         }
     } catch (error) {
         console.error('生成引流链接失败:', error);
