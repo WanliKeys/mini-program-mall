@@ -2912,14 +2912,8 @@ function showReferralLinkModal(data) {
     document.getElementById('referral-product-name').textContent = currentReferralProduct.name;
     document.getElementById('referral-product-price').textContent = `¥${currentReferralProduct.price}`;
     
-    // 填充链接信息
-    document.getElementById('referral-base-url').value = data.baseUrl;
+    // linkCode 仅用于内部生成 URL Link（不再展示其他落地页信息）
     document.getElementById('referral-link-code').value = data.linkCode;
-    document.getElementById('referral-full-template').value = data.template;
-    const signedApiElem = document.getElementById('referral-signed-api');
-    if (signedApiElem) {
-        signedApiElem.value = data.signedLinkApi || '';
-    }
     // 给引流方示例占位值，真实落地由引流方替换
     document.getElementById('referral-partner-order-no').value = `ORDER_FAKE_${Date.now()}`;
     document.getElementById('referral-notify-url').value = 'https://example.com/notify';

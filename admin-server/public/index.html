@@ -1063,49 +1063,15 @@
                     </div>
                 </div>
                 
-                <div class="form-group">
-                    <label>基础链接</label>
-                    <input type="text" id="referral-base-url" class="form-control" readonly>
-                </div>
-                
-                <div class="form-group">
-                    <label>链接码</label>
-                    <input type="text" id="referral-link-code" class="form-control" readonly>
-                </div>
-                
-                <div class="form-group">
-                    <label>完整链接模板</label>
-                    <div style="display: flex; gap: 8px;">
-                        <input type="text" id="referral-full-template" class="form-control" readonly>
-                        <button class="btn btn-outline" onclick="copyReferralTemplate()">
-                            <i class="bi bi-clipboard"></i> 复制
-                        </button>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>签名链接接口（POST）</label>
-                    <input type="text" id="referral-signed-api" class="form-control" readonly>
-                </div>
-                
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i>
-                    <div>
-                        <strong>使用说明：</strong>
-                        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-                            <li>引流方替换模板中的 {引流方订单号}/{通知地址}/{可选外部订单号}</li>
-                            <li>引流方调用上方接口生成最终的 signedUrl（POST 参数：linkCode、partnerOrderNo、notifyUrl、externalOrderNo、env）</li>
-                            <li>接口响应的 signedUrl 直接用于 H5，落地页会自动调起小程序</li>
-                            <li>notifyUrl 需 URL 编码，env 可选 trial/release，默认为 release</li>
-                        </ul>
-                    </div>
-                </div>
-
                 <hr style="margin: 16px 0;">
 
                 <div class="form-group">
                     <label>直接生成 URL Link（可在任意浏览器唤起微信）</label>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div>
+                            <label style="font-size: 12px; color: #666;">链接码 linkCode</label>
+                            <input type="text" id="referral-link-code" class="form-control" readonly>
+                        </div>
                         <div>
                             <label style="font-size: 12px; color: #666;">引流方订单号 partnerOrderNo</label>
                             <input type="text" id="referral-partner-order-no" class="form-control" placeholder="必填，唯一订单号">
