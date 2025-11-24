@@ -222,6 +222,9 @@ router.post('/', asyncHandler(async (req, res) => {
       tags,
       image: imageFromBody
     } = req.body;
+    // 如果没有传卡密价格/库存，默认与商品价格/库存一致，避免卡密商品漏填导致不分配
+    const normalizedCardPrice = cardPrice !== undefined ? cardPrice : price;
+    const normalizedCardStock = cardStock !== undefined ? cardStock : stock;
     console.log('[admin.products.create] received body:', {
       categoryId,
       name,
@@ -271,8 +274,8 @@ router.post('/', asyncHandler(async (req, res) => {
       price,
       originalPrice,
       stock || 0,
-      cardPrice || null,
-      cardStock || 0,
+      normalizedCardPrice || null,
+      normalizedCardStock || 0,
       status,
       JSON.stringify(tagsArray)
     ];
@@ -310,6 +313,10 @@ router.put('/:id', asyncHandler(async (req, res) => {
       image
     } = req.body;
     console.log('[admin.products.update] id:', id, 'body.image:', image);
+
+    // 如果未显式传卡密价格/库存，用商品价格/库存兜底（避免编辑界面未提供字段导致清空）
+    const normalizedCardPrice = cardPrice !== undefined ? cardPrice : price;
+    const normalizedCardStock = cardStock !== undefined ? cardStock : stock;
     
     // 检查商品是否存在
     const existingProducts = await query(
@@ -357,14 +364,14 @@ router.put('/:id', asyncHandler(async (req, res) => {
       updateValues.push(stock);
     }
 
-    if (cardPrice !== undefined) {
+    if (normalizedCardPrice !== undefined) {
       updateFields.push('card_price = ?');
-      updateValues.push(cardPrice || null);
+      updateValues.push(normalizedCardPrice || null);
     }
 
-    if (cardStock !== undefined) {
+    if (normalizedCardStock !== undefined) {
       updateFields.push('card_stock = ?');
-      updateValues.push(cardStock || 0);
+      updateValues.push(normalizedCardStock || 0);
     }
 
     if (status !== undefined) {
