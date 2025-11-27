@@ -134,8 +134,8 @@ router.get('/orders', adminAuth, asyncHandler(async (req, res) => {
     params.push(status);
   }
   if (search) {
-    where.push('(o.order_no LIKE ? OR u.username LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`);
+    where.push('(o.order_no LIKE ? OR u.username LIKE ? OR u.nickname LIKE ? OR u.openid LIKE ?)');
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
   if (from) {
     where.push('o.created_at >= ?');
@@ -158,10 +158,10 @@ router.get('/orders', adminAuth, asyncHandler(async (req, res) => {
             o.total_amount AS amount,
             o.status,
             o.created_at AS createdAt,
-            u.username AS userName
-     ${baseFrom}
-     ${whereSql}
-     ORDER BY o.created_at DESC
+            COALESCE(u.username, u.nickname, u.phone, CONCAT('用户', o.user_id)) AS userName
+      ${baseFrom}
+      ${whereSql}
+      ORDER BY o.created_at DESC
      LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );
@@ -309,5 +309,3 @@ router.put('/orders/:id/status', adminAuth, asyncHandler(async (req, res) => {
 }));
 
 module.exports = router;
-
-
