@@ -146,7 +146,7 @@ router.get('/orders', adminAuth, asyncHandler(async (req, res) => {
     params.push(to + ' 23:59:59');
   }
   const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
-  const baseFrom = 'FROM orders o LEFT JOIN users u ON u.id = o.user_id';
+  const baseFrom = 'FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN referral_orders ro ON ro.our_order_id = o.id';
 
   const limit = parseInt(pageSize, 10) || 10;
   const offset = (parseInt(page, 10) - 1) * limit;
@@ -158,7 +158,8 @@ router.get('/orders', adminAuth, asyncHandler(async (req, res) => {
             o.total_amount AS amount,
             o.status,
             o.created_at AS createdAt,
-            COALESCE(u.username, u.nickname, u.phone, CONCAT('用户', o.user_id)) AS userName
+            COALESCE(u.username, u.nickname, u.phone, CONCAT('用户', o.user_id)) AS userName,
+            COALESCE(ro.partner_order_no, o.external_order_no) AS partnerOrderNo
       ${baseFrom}
       ${whereSql}
       ORDER BY o.created_at DESC

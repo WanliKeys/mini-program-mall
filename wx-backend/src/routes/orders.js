@@ -186,9 +186,15 @@ router.post('/', asyncHandler(async (req, res) => {
     // 生成订单号
     let orderNo;
     let source = 'direct';
-    
-    if (externalOrderNo) {
-      // 来自引流平台，直接使用外部订单号
+    let finalExternalOrderNo = externalOrderNo || null;
+
+    if (isReferral && partnerOrderNo) {
+      // 引流订单：直接用引流方单号作为我们的订单号，方便对账
+      orderNo = partnerOrderNo;
+      finalExternalOrderNo = partnerOrderNo;
+      source = 'referral';
+    } else if (externalOrderNo) {
+      // 来自外部平台的订单号
       orderNo = externalOrderNo;
       source = 'external';
     } else {
@@ -206,7 +212,7 @@ router.post('/', asyncHandler(async (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         orderNo, userId, addressId || null, totalAmount, paymentMethod, 'pending', remark || null,
-        externalOrderNo || null, source, reservation.reservationId
+        finalExternalOrderNo, source, reservation.reservationId
       ]
     );
     

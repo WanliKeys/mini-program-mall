@@ -455,7 +455,7 @@ function renderRecentOrders(orders) {
     if (!tbody) return;
     
     if (!orders || orders.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无订单数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">暂无订单数据</td></tr>';
         return;
     }
     
@@ -1133,7 +1133,7 @@ async function loadCategories() {
     categoriesStore.error = null;
 
     const tbody = document.getElementById('categories-table');
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="loading show"><div class="spinner-border" role="status"><span class="visually-hidden">加载中...</span></div></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center"><div class="loading show"><div class="spinner-border" role="status"><span class="visually-hidden">加载中...</span></div></div></td></tr>';
 
     // 获取搜索和筛选参数
     const searchTerm = document.getElementById('category-search')?.value || '';
@@ -1554,7 +1554,7 @@ async function loadOrders() {
         }
     } catch (error) {
         console.error('加载订单列表失败:', error);
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">加载失败: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">加载失败: ${error.message}</td></tr>`;
     }
 }
 
@@ -1570,6 +1570,7 @@ function renderOrdersTable(orders) {
     tbody.innerHTML = orders.map(order => `
         <tr>
             <td>${order.orderNo || order.orderNumber || order.id}</td>
+            <td>${order.partnerOrderNo || order.externalOrderNo || ''}</td>
             <td>${order.userName || order.user_name || '未知用户'}</td>
             <td>¥${parseFloat(order.amount || order.totalAmount || order.total_amount || 0).toFixed(2)}</td>
             <td><span class="status-badge status-${order.status}">${getStatusText(order.status)}</span></td>
