@@ -257,12 +257,17 @@ router.post('/', asyncHandler(async (req, res) => {
           const referralLinkId = referralLinks[0].id;
           
           // 更新引流订单记录，关联我们的订单ID
-          await query(
+          const linkUpdateResult = await query(
             'UPDATE referral_orders SET our_order_id = ?, updated_at = NOW() WHERE referral_link_id = ? AND partner_order_no = ?',
             [orderId, referralLinkId, partnerOrderNo]
           );
-          
-          console.log(`引流订单关联成功: ${partnerOrderNo} -> ${orderId}`);
+
+          const affectedRows = linkUpdateResult?.affectedRows || linkUpdateResult?.[0]?.affectedRows || 0;
+          if (affectedRows > 0) {
+            console.log(`引流订单关联成功: ${partnerOrderNo} -> ${orderId}`);
+          } else {
+            console.warn(`引流订单关联失败，未找到记录: ${partnerOrderNo} (referral_link_id=${referralLinkId})`);
+          }
         }
       } catch (err) {
         console.error('关联引流订单失败:', err);

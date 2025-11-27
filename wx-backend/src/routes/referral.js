@@ -377,13 +377,30 @@ router.post('/url-link', asyncHandler(async (req, res) => {
 
   // 通过 linkCode 获取商品
   const links = await query(
-    'SELECT product_id FROM referral_links WHERE link_code = ? AND status = "active" LIMIT 1',
+    'SELECT * FROM referral_links WHERE link_code = ? AND status = "active" LIMIT 1',
     [linkCode]
   );
   if (links.length === 0) {
     return error(res, '引流链接不存在或已失效', 404);
   }
-  const productId = links[0].product_id;
+  const link = links[0];
+  const productId = link.product_id;
+
+  // 落库引流订单（url-link 之前没有写入 referral_orders，补齐，避免后续通知缺失）
+  const existingOrders = await query(
+    'SELECT id FROM referral_orders WHERE partner_order_no = ? LIMIT 1',
+    [partnerOrderNo]
+  );
+
+  if (existingOrders.length === 0) {
+    await query(
+      'INSERT INTO referral_orders (referral_link_id, partner_order_no, notify_url) VALUES (?, ?, ?)',
+      [link.id, partnerOrderNo, notifyUrl]
+    );
+    console.log(`创建引流订单记录: ${partnerOrderNo} -> referral_link_id ${link.id}`);
+  } else {
+    console.log(`引流订单已存在，复用: ${partnerOrderNo}`);
+  }
 
   const miniProgramPath = buildMiniProgramPath({
     productId,
