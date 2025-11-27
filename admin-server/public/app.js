@@ -3,6 +3,27 @@ const API_BASE = '/api';
 let currentToken = localStorage.getItem('admin_token');
 let currentPage = 'dashboard';
 
+// 全局拦截fetch，捕获401后自动退回登录页（仅针对 /api/admin/ 或同源 /api 路径）
+const __originalFetch = window.fetch;
+window.fetch = async (...args) => {
+    const resp = await __originalFetch(...args);
+    try {
+        const req = args[0];
+        const url = typeof req === 'string' ? req : (req?.url || '');
+        const isAdminApi = url.includes('/api/admin/');
+        // 同源 /api 请求且返回401才跳转，避免误伤第三方接口
+        if (resp && resp.status === 401 && isAdminApi) {
+            console.warn('检测到admin接口401，清除token并跳转登录');
+            currentToken = null;
+            localStorage.removeItem('admin_token');
+            showPage('login');
+        }
+    } catch (e) {
+        console.warn('fetch拦截器处理异常:', e.message || e);
+    }
+    return resp;
+};
+
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
     console.log('页面加载完成');
