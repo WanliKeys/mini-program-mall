@@ -918,11 +918,26 @@ async function notifyReferralPartner(order, payment) {
 
     const referralOrder = referralOrders[0];
 
+    // 查询订单关联的卡密信息
+    let cardCode = null;
+    if (order.card_code_id) {
+      const cardCodes = await query(
+        'SELECT code FROM card_codes WHERE id = ?',
+        [order.card_code_id]
+      );
+      if (cardCodes.length > 0) {
+        cardCode = cardCodes[0].code;
+      }
+    }
+
     const notifyData = {
       orderNo: referralOrder.partner_order_no,
       amount: parseFloat(order.total_amount),
-      status: 'paid'
+      status: 'paid',
+      cardCode: cardCode  // 新增卡密字段
     };
+
+    console.log('通知引流方数据:', notifyData);
 
     // 调用带重试机制的通知函数
     await notifyWithRetry(referralOrder, notifyData);
