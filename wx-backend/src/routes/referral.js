@@ -248,7 +248,10 @@ router.post('/order', asyncHandler(async (req, res) => {
     if (!linkCode || !partnerOrderNo || !notifyUrl) {
       return error(res, '参数不完整', 400);
     }
-    
+
+    // 解码 notifyUrl（防止引流方传入 URL 编码后的地址）
+    const decodedNotifyUrl = decodeURIComponent(notifyUrl);
+
     // 验证引流链接
     const links = await query(
       'SELECT * FROM referral_links WHERE link_code = ? AND status = "active"',
@@ -274,21 +277,21 @@ router.post('/order', asyncHandler(async (req, res) => {
     // 创建引流订单记录
     await query(
       'INSERT INTO referral_orders (referral_link_id, partner_order_no, notify_url) VALUES (?, ?, ?)',
-      [link.id, partnerOrderNo, notifyUrl]
+      [link.id, partnerOrderNo, decodedNotifyUrl]
     );
 
     const signedLink = await generateSignedLandingUrl(link, {
       linkCode,
       partnerOrderNo,
-      notifyUrl,
+      notifyUrl: decodedNotifyUrl,
       externalOrderNo,
       env
     });
-    
+
     success(res, {
       linkCode,
       partnerOrderNo,
-      notifyUrl,
+      notifyUrl: decodedNotifyUrl,
       externalOrderNo: externalOrderNo || null,
       env,
       signedUrl: signedLink.signedUrl,
@@ -322,6 +325,9 @@ router.post('/signed-link', asyncHandler(async (req, res) => {
     return error(res, '参数不完整，必须包含 linkCode/partnerOrderNo/notifyUrl', 400);
   }
 
+  // 解码 notifyUrl（防止引流方传入 URL 编码后的地址）
+  const decodedNotifyUrl = decodeURIComponent(notifyUrl);
+
   // 验证引流链接有效
   const links = await query(
     'SELECT * FROM referral_links WHERE link_code = ? AND status = "active" LIMIT 1',
@@ -336,7 +342,7 @@ router.post('/signed-link', asyncHandler(async (req, res) => {
     const signedLink = await generateSignedLandingUrl(link, {
       linkCode,
       partnerOrderNo,
-      notifyUrl,
+      notifyUrl: decodedNotifyUrl,
       externalOrderNo,
       env
     });
@@ -350,7 +356,7 @@ router.post('/signed-link', asyncHandler(async (req, res) => {
       landingBase: signedLink.landingBase,
       linkCode,
       partnerOrderNo,
-      notifyUrl,
+      notifyUrl: decodedNotifyUrl,
       externalOrderNo: externalOrderNo || null,
       env
     }, '生成落地页签名链接成功');
@@ -375,6 +381,9 @@ router.post('/url-link', asyncHandler(async (req, res) => {
     return error(res, '参数不完整，必须包含 linkCode/partnerOrderNo/notifyUrl', 400);
   }
 
+  // 解码 notifyUrl（防止引流方传入 URL 编码后的地址）
+  const decodedNotifyUrl = decodeURIComponent(notifyUrl);
+
   // 通过 linkCode 获取商品
   const links = await query(
     'SELECT * FROM referral_links WHERE link_code = ? AND status = "active" LIMIT 1',
@@ -395,9 +404,9 @@ router.post('/url-link', asyncHandler(async (req, res) => {
   if (existingOrders.length === 0) {
     await query(
       'INSERT INTO referral_orders (referral_link_id, partner_order_no, notify_url) VALUES (?, ?, ?)',
-      [link.id, partnerOrderNo, notifyUrl]
+      [link.id, partnerOrderNo, decodedNotifyUrl]
     );
-    console.log(`创建引流订单记录: ${partnerOrderNo} -> referral_link_id ${link.id}`);
+    console.log(`创建引流订单记录: ${partnerOrderNo} -> referral_link_id ${link.id}, notifyUrl: ${decodedNotifyUrl}`);
   } else {
     console.log(`引流订单已存在，复用: ${partnerOrderNo}`);
   }
@@ -406,7 +415,7 @@ router.post('/url-link', asyncHandler(async (req, res) => {
     productId,
     linkCode,
     partnerOrderNo,
-    notifyUrl,
+    notifyUrl: decodedNotifyUrl,
     quantity: 1
   });
 
