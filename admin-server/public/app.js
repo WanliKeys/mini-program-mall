@@ -474,12 +474,12 @@ async function loadDashboard() {
 function renderRecentOrders(orders) {
     const tbody = document.getElementById('recent-orders');
     if (!tbody) return;
-    
+
     if (!orders || orders.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">暂无订单数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无订单数据</td></tr>';
         return;
     }
-    
+
     const statusMap = {
         'pending': { text: '待支付', class: 'status-pending' },
         'paid': { text: '已支付', class: 'status-paid' },
@@ -487,17 +487,17 @@ function renderRecentOrders(orders) {
         'completed': { text: '已完成', class: 'status-completed' },
         'cancelled': { text: '已取消', class: 'status-cancelled' }
     };
-    
+
     tbody.innerHTML = orders.map(order => {
         const status = statusMap[order.status] || { text: order.status, class: 'status-unknown' };
         const createdAt = new Date(order.createdAt).toLocaleString('zh-CN');
-        
+
         return `
             <tr>
                 <td>${order.orderNo}</td>
-                <td>用户${order.id}</td>
                 <td>¥${parseFloat(order.amount).toFixed(2)}</td>
                 <td><span class="status-badge ${status.class}">${status.text}</span></td>
+                <td>${order.cardCode || ''}</td>
                 <td>${createdAt}</td>
                 <td>
                     <button class="btn btn-sm btn-outline" onclick="viewOrder(${order.id})">
@@ -1582,24 +1582,23 @@ async function loadOrders() {
 // 渲染订单表格
 function renderOrdersTable(orders) {
     const tbody = document.getElementById('orders-table');
-    
+
     if (!orders || orders.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无订单数据</td></tr>';
         return;
     }
-    
+
     tbody.innerHTML = orders.map(order => `
         <tr>
             <td>${order.orderNo || order.orderNumber || order.id}</td>
-            <td>${order.partnerOrderNo || order.externalOrderNo || ''}</td>
-            <td>${order.userName || order.user_name || '未知用户'}</td>
             <td>¥${parseFloat(order.amount || order.totalAmount || order.total_amount || 0).toFixed(2)}</td>
             <td><span class="status-badge status-${order.status}">${getStatusText(order.status)}</span></td>
+            <td>${order.cardCode || ''}</td>
             <td>${new Date(order.createdAt || order.created_at).toLocaleString('zh-CN')}</td>
             <td>
                 <button class="btn btn-sm btn-outline-primary" onclick="viewOrder(${order.id})">查看</button>
-                </td>
-            </tr>
+            </td>
+        </tr>
     `).join('');
 }
 

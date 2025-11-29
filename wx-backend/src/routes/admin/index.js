@@ -55,7 +55,12 @@ router.get('/dashboard', adminAuth, asyncHandler(async (req, res) => {
   const [orderCount] = await query('SELECT COUNT(*) as c FROM orders');
   const [categoryCount] = await query('SELECT COUNT(*) as c FROM categories');
   const [bannerCount] = await query('SELECT COUNT(*) as c FROM banners');
-  const recentOrders = await query('SELECT id, order_no as orderNo, total_amount as amount, status, created_at as createdAt FROM orders ORDER BY created_at DESC LIMIT 5');
+  const recentOrders = await query(`
+    SELECT o.id, o.order_no as orderNo, o.total_amount as amount, o.status, o.created_at as createdAt, cc.code as cardCode
+    FROM orders o
+    LEFT JOIN card_codes cc ON cc.id = o.card_code_id
+    ORDER BY o.created_at DESC LIMIT 5
+  `);
   return success(res, {
     totalProducts: productCount.c,
     totalOrders: orderCount.c,
@@ -146,20 +151,19 @@ router.get('/orders', adminAuth, asyncHandler(async (req, res) => {
     params.push(to + ' 23:59:59');
   }
   const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
-  const baseFrom = 'FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN referral_orders ro ON ro.our_order_id = o.id';
+  const baseFrom = 'FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN referral_orders ro ON ro.our_order_id = o.id LEFT JOIN card_codes cc ON cc.id = o.card_code_id';
 
   const limit = parseInt(pageSize, 10) || 10;
   const offset = (parseInt(page, 10) - 1) * limit;
 
-  // 列表，联表 users 获取用户名
+  // 列表，联表 card_codes 获取卡密
   const orders = await query(
     `SELECT o.id,
             o.order_no AS orderNo,
             o.total_amount AS amount,
             o.status,
             o.created_at AS createdAt,
-            COALESCE(u.username, u.nickname, u.phone, CONCAT('用户', o.user_id)) AS userName,
-            COALESCE(ro.partner_order_no, o.external_order_no) AS partnerOrderNo
+            cc.code AS cardCode
       ${baseFrom}
       ${whereSql}
       ORDER BY o.created_at DESC

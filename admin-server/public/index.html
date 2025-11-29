@@ -270,9 +270,9 @@
                                 <thead>
                                     <tr>
                                         <th>订单号</th>
-                                        <th>用户</th>
                                         <th>金额</th>
                                         <th>状态</th>
+                                        <th>卡密</th>
                                         <th>创建时间</th>
                                         <th>操作</th>
                                     </tr>
@@ -619,11 +619,11 @@
                                         </div>
                                         <div class="dropdown-item" data-value="pending">
                                             <i class="bi bi-check"></i>
-                                            <span>待付款</span>
+                                            <span>待支付</span>
                                         </div>
                                         <div class="dropdown-item" data-value="paid">
                                             <i class="bi bi-check"></i>
-                                            <span>已付款</span>
+                                            <span>已支付</span>
                                         </div>
                                         <div class="dropdown-item" data-value="shipped">
                                             <i class="bi bi-check"></i>
@@ -664,18 +664,17 @@
                             <table class="data-table">
                                 <thead>
                                     <tr>
-                                        <th width="180">订单号</th>
-                                        <th width="180">引流单号</th>
-                                        <th width="120">用户</th>
+                                        <th width="220">订单号</th>
                                         <th width="100">金额</th>
                                         <th width="100">状态</th>
-                                        <th width="150">创建时间</th>
-                                        <th width="120">操作</th>
+                                        <th width="240">卡密</th>
+                                        <th width="180">创建时间</th>
+                                        <th width="100">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="orders-table">
                                     <tr>
-                                        <td colspan="7" class="text-center">
+                                        <td colspan="6" class="text-center">
                                             <div class="loading-state">
                                                 <div class="spinner"></div>
                                                 <p>加载中...</p>
