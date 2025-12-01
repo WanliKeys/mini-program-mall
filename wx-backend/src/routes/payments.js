@@ -918,12 +918,16 @@ async function notifyReferralPartner(order, payment) {
 
     const referralOrder = referralOrders[0];
 
-    // 查询订单关联的卡密信息
+    // 重新查询订单的最新卡密信息（因为传入的order对象可能是分配卡密之前的）
     let cardCode = null;
-    if (order.card_code_id) {
+    const latestOrder = await query(
+      'SELECT card_code_id FROM orders WHERE id = ?',
+      [order.id]
+    );
+    if (latestOrder.length > 0 && latestOrder[0].card_code_id) {
       const cardCodes = await query(
         'SELECT code FROM card_codes WHERE id = ?',
-        [order.card_code_id]
+        [latestOrder[0].card_code_id]
       );
       if (cardCodes.length > 0) {
         cardCode = cardCodes[0].code;
