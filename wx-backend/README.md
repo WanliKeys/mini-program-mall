@@ -62,12 +62,24 @@ WECHAT_APPID=your_wechat_appid
 WECHAT_SECRET=your_wechat_secret
 ```
 
-### 3. 初始化数据库
+### 3. 支付配置说明（6jqb 聚合支付）
+
+后端通过 6jqb 的 `unifiedOrder` 发起小程序支付，返回的 `payDataType=wxapp` 和 `payData` 会直接交给小程序 `wx.requestPayment`；6jqb 会通过 `notifyUrl` 回调到后端，后端验签后更新支付状态并触发发货/引流方通知。
+
+需要配置（见 `env.example`）：
+- `JQB_PAY_BASE_URL` / `JQB_PAY_MCH_NO` / `JQB_PAY_APP_ID` / `JQB_PAY_KEY`
+- `JQB_PAY_NOTIFY_URL`（建议指向后端：`/api/payments/notify`）
+- `JQB_PAY_RETURN_URL`（建议指向站点上的 `pay-return.html`）
+- `JQB_PAY_IS_SUB_OPENID`（特约商户且使用自有小程序 openid 时按文档开启）
+- `JQB_PAY_STRICT_RESPONSE_SIGN`（默认建议 `false`，下单同步返回验签失败时仅告警，不阻断支付拉起）
+- `PAY_DEFAULT_METHOD` / `PAY_FORCE_METHOD`（用于灰度切换 wechat 与 wxpay）
+
+### 4. 初始化数据库
 ```bash
 mysql -u root -p < database.sql
 ```
 
-### 4. 启动服务
+### 5. 启动服务
 
 开发环境：
 ```bash
@@ -148,16 +160,16 @@ POST /api/orders
 4. 配置数据库连接池
 5. 设置日志轮转
 
-### Docker部署
-```dockerfile
-# Dockerfile示例
-FROM node:16-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-EXPOSE 3000
-CMD ["npm", "start"]
+### PM2 启动示例
+```bash
+cd /var/www/mall/wx-backend
+cp env.example .env
+vim .env
+npm ci --omit=dev
+
+cd /var/www/mall
+pm2 start ecosystem.config.js --only mall-backend
+pm2 logs mall-backend
 ```
 
 ## 📈 性能优化

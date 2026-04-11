@@ -1,24 +1,16 @@
+const path = require('path');
+
 module.exports = {
   apps: [
     {
       name: 'mall-backend',
-      script: './wx-backend/src/app.js',
-      cwd: '/var/www/mall',
+      script: 'src/app.js',
+      cwd: path.join(__dirname, 'wx-backend'),
       instances: 1,
       exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
-        PORT: 3000,
-        // 添加完整的微信支付配置
-        WECHAT_APPID: 'wx0b1ce2aa786ec457',
-        WECHAT_SECRET: '16a6ad695e02fafa7fd425b0a824226d',
-        WECHAT_PAY_PRIVATE_KEY_PATH: '/var/www/mall/wx-backend/certs/apiclient_key.pem',
-        WECHAT_PAY_MCHID: '1728730424',
-        WECHAT_PAY_CERT_SERIAL_NO: '52561F95DFC276248CAB5F5B328AACBD29796490',
-        WECHAT_PAY_APIV3_KEY: '6A17F7871DD7E4B83F0092EC44819F98',
-        WECHAT_PAY_NOTIFY_URL: 'https://jxxcfwlkj.cn/api/payments/callback/wechat',
-        FRONTEND_URL: 'https://jxxcfwlkj.cn',
-        WECHAT_PAY_MOCK: false
+        PORT: 3000
       },
       log_file: '/var/log/mall/mall-backend.log',
       out_file: '/var/log/mall/mall-backend-out.log',
@@ -35,13 +27,13 @@ module.exports = {
     },
     {
       name: 'mall-admin',
-      script: './admin-server/src/app.js',
-      cwd: '/var/www/mall',
+      script: 'server.js',
+      cwd: path.join(__dirname, 'admin-server'),
       instances: 1,
       exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
-        PORT: 3001
+        ADMIN_PORT: 3001
       },
       log_file: '/var/log/mall/mall-admin.log',
       out_file: '/var/log/mall/mall-admin-out.log',

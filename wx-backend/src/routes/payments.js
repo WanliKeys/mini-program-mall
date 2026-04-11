@@ -8,16 +8,28 @@ const axios = require('axios');
 const moment = require('moment');
 const { confirmReservation, assignCardCodes } = require('../utils/inventory');
 const WeChatPay = require('../utils/wechatPay');
+const { verifyMd5, createGatewayOrder, queryGatewayOrder } = require('../utils/gatewayPay');
 const { beginTransaction, commit, rollback } = require('../config/database');
 
 // 所有支付接口都需要认证（除了回调接口）
 router.use((req, res, next) => {
-  // 回调接口不需要认证
-  if (req.path.includes('/callback/')) {
+  // 回调接口不需要认证（/callback/* 和 /notify）
+  if (req.path.includes('/callback/') || req.path === '/notify') {
     return next();
   }
   return authenticate(req, res, next);
 });
+
+function unwrapRequestParams(params) {
+  const normalized = {};
+
+  Object.keys(params || {}).forEach((key) => {
+    const value = params[key];
+    normalized[key] = Array.isArray(value) ? value[0] : value;
+  });
+
+  return normalized;
+}
 
 /**
  * 发起支付
@@ -26,7 +38,17 @@ router.use((req, res, next) => {
 router.post('/pay', asyncHandler(async (req, res) => {
   try {
     const userId = req.user.id;
-    const { orderId, paymentMethod = 'wechat' } = req.body;
+    const { orderId, paymentMethod: requestedMethod } = req.body;
+    const paymentMethod = (process.env.PAY_FORCE_METHOD || requestedMethod || process.env.PAY_DEFAULT_METHOD || 'wechat').toString();
+
+    console.log('💳 /payments/pay method resolved:', {
+      orderId,
+      userId,
+      requestedMethod: requestedMethod || null,
+      PAY_FORCE_METHOD: process.env.PAY_FORCE_METHOD || null,
+      PAY_DEFAULT_METHOD: process.env.PAY_DEFAULT_METHOD || null,
+      resolved: paymentMethod
+    });
     
     // 验证订单
     const orders = await query(
@@ -61,10 +83,10 @@ router.post('/pay', asyncHandler(async (req, res) => {
 
     // 模拟支付开关：最小改动，直接走成功路径（用于联调/发卡密流程验证）
     if (process.env.WECHAT_PAY_MOCK === 'true') {
-      await handlePaymentSuccess(paymentNo, 'MOCK_TRANSACTION', 'wechat');
-      paymentData = { paymentId, paymentNo, paymentMethod: 'wechat', mock: true };
+      await handlePaymentSuccess(paymentNo, 'MOCK_TRANSACTION', paymentMethod);
+      paymentData = { paymentId, paymentNo, paymentMethod, mock: true };
     } else if (paymentMethod === 'wechat') {
-      // 微信支付
+      // 微信支付（原生小程序 wx.requestPayment）
       try {
         const wechatPay = new WeChatPay();
         
@@ -95,7 +117,50 @@ router.post('/pay', asyncHandler(async (req, res) => {
         console.error('微信支付创建失败:', err);
         throw err;
       }
-      
+    } else if (paymentMethod === 'wxpay') {
+      // 6jqb 聚合支付（微信小程序）
+      const clientIp =
+        (req.headers['x-forwarded-for'] && req.headers['x-forwarded-for'].toString().split(',')[0].trim()) ||
+        req.ip ||
+        req.connection?.remoteAddress ||
+        '';
+
+      const users = await query('SELECT openid FROM users WHERE id = ?', [userId]);
+      const userOpenid = users.length > 0 ? users[0].openid : null;
+
+      if (!userOpenid && process.env.NODE_ENV === 'production') {
+        return error(res, '用户openid不存在', 400);
+      }
+
+      const orderItems = await query(
+        'SELECT product_name FROM order_items WHERE order_id = ? LIMIT 1',
+        [orderId]
+      );
+      const productName = orderItems.length > 0 ? orderItems[0].product_name : '商城订单';
+      const gatewayResp = await createGatewayOrder({
+        paymentNo,
+        amount: order.total_amount,
+        clientIp,
+        subject: productName,
+        body: productName,
+        openid: userOpenid || 'mock_openid',
+        extParam: orderId.toString()
+      });
+
+      paymentData = {
+        paymentId,
+        paymentNo,
+        paymentMethod: 'wxpay',
+        payOrderId: gatewayResp.payOrderId,
+        payDataType: gatewayResp.payDataType,
+        payData: gatewayResp.payData
+      };
+
+      console.log('💳 /payments/pay 6jqb response:', {
+        paymentNo,
+        payOrderId: gatewayResp.payOrderId,
+        payDataType: gatewayResp.payDataType
+      });
     } else {
       return error(res, '不支持的支付方式', 400);
     }
@@ -438,22 +503,146 @@ router.post('/callback/wechat', asyncHandler(async (req, res) => {
   }
 }));
 
+/**
+ * 支付回调处理 (6jqb 支付网关)
+ * GET/POST /api/payments/callback/gateway
+ * GET/POST /api/payments/notify
+ * 文档要求：收到异步通知后返回 success（纯文本）
+ */
+async function handleGatewayCallback(req, res) {
+  try {
+    console.log('6jqb raw callback:', {
+      method: req.method,
+      contentType: req.headers['content-type'] || '',
+      headers: req.headers,
+      query: req.query,
+      body: req.body
+    });
+
+    const sourceParams = (req.body && Object.keys(req.body).length > 0) ? req.body : req.query;
+    const params = unwrapRequestParams(sourceParams || {});
+
+    console.log('📥 收到 6jqb 支付回调:', {
+      method: req.method,
+      mchOrderNo: params.mchOrderNo,
+      payOrderId: params.payOrderId,
+      state: params.state,
+      amount: params.amount
+    });
+
+    const key = process.env.JQB_PAY_KEY;
+    if (!key) {
+      console.error('6jqb 回调验签失败：缺少 JQB_PAY_KEY 配置');
+      return res.status(500).send('fail');
+    }
+
+    if (!verifyMd5(params, key)) {
+      console.warn('6jqb 回调验签失败', {
+        mchOrderNo: params.mchOrderNo,
+        payOrderId: params.payOrderId
+      });
+      return res.status(400).send('fail');
+    }
+
+    const paymentNo = params.mchOrderNo;
+    const payOrderId = params.payOrderId || '';
+    const state = Number.parseInt(params.state || '-1', 10);
+    const amount = Number.parseInt(params.amount || '-1', 10);
+
+    if (!paymentNo) {
+      console.error('回调缺少 mchOrderNo');
+      return res.status(400).send('fail');
+    }
+
+    const paymentRecords = await query(
+      `SELECT p.*, o.status AS order_status
+       FROM payments p
+       JOIN orders o ON o.id = p.order_id
+       WHERE p.payment_no = ?
+       LIMIT 1`,
+      [paymentNo]
+    );
+
+    if (paymentRecords.length === 0) {
+      console.error('支付记录不存在:', paymentNo);
+      return res.status(400).send('fail');
+    }
+
+    const paymentRecord = paymentRecords[0];
+    const expectedAmount = Math.round(parseFloat(paymentRecord.amount) * 100);
+
+    if (Number.isFinite(amount) && amount >= 0 && expectedAmount !== amount) {
+      console.error('回调金额不匹配', {
+        paymentNo,
+        expectedAmount,
+        actualAmount: amount
+      });
+      return res.status(400).send('fail');
+    }
+
+    if (payOrderId && paymentRecord.transaction_id !== payOrderId) {
+      await query(
+        'UPDATE payments SET transaction_id = ?, updated_at = NOW() WHERE id = ?',
+        [payOrderId, paymentRecord.id]
+      );
+    }
+
+    if (state === 2) {
+      if (paymentRecord.status !== 'success' && paymentRecord.order_status !== 'completed') {
+        console.log('处理 6jqb 支付成功:', { paymentNo, payOrderId });
+        await handlePaymentSuccess(
+          paymentRecord.payment_no,
+          params.outTransId || params.channelOrderNo || payOrderId || 'JQB_PAY_ORDER',
+          'wxpay'
+        );
+      } else {
+        console.log('订单已处理，跳过:', { paymentNo, status: paymentRecord.order_status });
+      }
+      return res.send('success');
+    }
+
+    if ([3, 4, 6].includes(state) && paymentRecord.status === 'pending') {
+      await query(
+        'UPDATE payments SET status = ?, updated_at = NOW() WHERE id = ?',
+        ['failed', paymentRecord.id]
+      );
+    }
+
+    return res.send('success');
+  } catch (err) {
+    console.error('6jqb 回调处理失败:', err.message, err.stack);
+    return res.status(500).send('fail');
+  }
+}
+
+router.get('/callback/gateway', asyncHandler(handleGatewayCallback));
+router.post('/callback/gateway', asyncHandler(handleGatewayCallback));
+
+// 别名路由：兼容前端使用的 /api/payments/notify 地址
+router.get('/notify', asyncHandler(handleGatewayCallback));
+router.post('/notify', asyncHandler(handleGatewayCallback));
+
 
 /**
  * 查询支付状态
  * GET /api/payments/status/:paymentNo
+ *
+ * paymentNo 可以是：
+ * 1. 后端生成的 payment_no
+ * 2. 第三方返回的 payOrderId / channelOrderNo (transaction_id)
  */
 router.get('/status/:paymentNo', asyncHandler(async (req, res) => {
   try {
     const userId = req.user.id;
     const paymentNo = req.params.paymentNo;
 
-    const payments = await query(
+    // 尝试多种方式查询支付记录
+    let payments = await query(
       `SELECT p.*
        FROM payments p
        JOIN orders o ON o.id = p.order_id
-       WHERE p.payment_no = ? AND o.user_id = ?`,
-      [paymentNo, userId]
+       WHERE (p.payment_no = ? OR p.transaction_id = ?) AND o.user_id = ?`,
+      [paymentNo, paymentNo, userId]
     );
 
     if (payments.length === 0) {
@@ -469,7 +658,8 @@ router.get('/status/:paymentNo', asyncHandler(async (req, res) => {
       paymentMethod: payment.payment_method,
       thirdPartyNo: payment.transaction_id,
       paidAt: payment.paid_at,
-      createdAt: payment.created_at
+      createdAt: payment.created_at,
+      orderId: payment.order_id
     }, '获取支付状态成功');
 
   } catch (err) {
@@ -479,7 +669,7 @@ router.get('/status/:paymentNo', asyncHandler(async (req, res) => {
 }));
 
 /**
- * 同步支付状态（主动查询微信支付状态）
+ * 同步支付状态（主动查询第三方支付状态）
  * POST /api/payments/sync/:paymentNo
  */
 router.post('/sync/:paymentNo', asyncHandler(async (req, res) => {
@@ -497,7 +687,7 @@ router.post('/sync/:paymentNo', asyncHandler(async (req, res) => {
 
     // 查询支付记录
     const payments = await query(
-      `SELECT p.*, o.user_id
+      `SELECT p.*, o.user_id, o.status AS order_status
        FROM payments p
        JOIN orders o ON o.id = p.order_id
        WHERE p.payment_no = ? AND o.user_id = ?`,
@@ -529,10 +719,76 @@ router.post('/sync/:paymentNo', asyncHandler(async (req, res) => {
       }, '支付状态同步完成');
     }
 
-    // 只对微信支付进行同步
+    if (payment.payment_method === 'wxpay') {
+      console.log('🔍 查询 6jqb 支付状态...');
+
+      try {
+        const gatewayOrderStatus = await queryGatewayOrder({
+          paymentNo: payment.payment_no,
+          payOrderId: payment.transaction_id || ''
+        });
+
+        console.log('✅ 6jqb 支付状态查询成功:', {
+          state: gatewayOrderStatus.state,
+          payOrderId: gatewayOrderStatus.payOrderId,
+          outTransId: gatewayOrderStatus.outTransId
+        });
+
+        if (gatewayOrderStatus.state === 2) {
+          if (payment.status !== 'success' && payment.order_status !== 'completed') {
+            await handlePaymentSuccess(
+              payment.payment_no,
+              gatewayOrderStatus.outTransId || gatewayOrderStatus.channelOrderNo || gatewayOrderStatus.payOrderId,
+              'wxpay'
+            );
+          }
+
+          return success(res, {
+            paymentNo: payment.payment_no,
+            status: 'success',
+            message: '支付状态同步成功',
+            synced: true,
+            transactionId: gatewayOrderStatus.outTransId || gatewayOrderStatus.payOrderId,
+            duration: Date.now() - syncStart + 'ms'
+          }, '支付状态同步成功');
+        }
+
+        if ([3, 4, 6].includes(gatewayOrderStatus.state)) {
+          await query(
+            'UPDATE payments SET status = ?, updated_at = NOW() WHERE payment_no = ?',
+            ['failed', paymentNo]
+          );
+
+          return success(res, {
+            paymentNo: payment.payment_no,
+            status: 'failed',
+            message: '支付已关闭或失败',
+            synced: true,
+            state: gatewayOrderStatus.state
+          }, '支付状态同步完成');
+        }
+
+        return success(res, {
+          paymentNo: payment.payment_no,
+          status: payment.status,
+          message: '支付仍在处理中',
+          synced: false,
+          state: gatewayOrderStatus.state
+        }, '支付状态同步完成');
+
+      } catch (gatewayError) {
+        console.error('❌ 6jqb 支付状态查询失败:', {
+          error: gatewayError.message,
+          paymentNo
+        });
+
+        return error(res, '支付状态查询失败: ' + gatewayError.message, 500);
+      }
+    }
+
     if (payment.payment_method !== 'wechat') {
-      console.log('ℹ️ 非微信支付，跳过同步:', { paymentMethod: payment.payment_method });
-      return error(res, '只支持微信支付状态同步', 400);
+      console.log('ℹ️ 该支付通道不支持主动同步:', { paymentMethod: payment.payment_method });
+      return error(res, '该支付通道不支持主动同步，请稍后查询支付状态', 400);
     }
 
     // 查询微信支付状态
@@ -780,19 +1036,23 @@ async function handlePaymentSuccess(paymentNo, thirdPartyNo, paymentMethod) {
       }
 
       // 调用第三方接口通知支付成功
-      try {
-        await notifyThirdParty(order, payment);
+      const thirdPartyNotifyResult = await notifyThirdParty(order, payment);
+      if (thirdPartyNotifyResult.status === 'success') {
         console.log('✅ 第三方通知发送成功');
-      } catch (notifyError) {
-        console.warn('⚠️ 第三方通知失败:', notifyError.message);
+      } else if (thirdPartyNotifyResult.status === 'skipped') {
+        console.log(`ℹ️ 第三方通知已跳过: ${thirdPartyNotifyResult.reason}`);
+      } else {
+        console.warn(`⚠️ 第三方通知失败: ${thirdPartyNotifyResult.reason}`);
       }
 
       // 通知引流方
-      try {
-        await notifyReferralPartner(order, payment);
+      const referralNotifyResult = await notifyReferralPartner(order, payment);
+      if (referralNotifyResult.status === 'success') {
         console.log('✅ 引流方通知发送成功');
-      } catch (referralError) {
-        console.warn('⚠️ 引流方通知失败:', referralError.message);
+      } else if (referralNotifyResult.status === 'skipped') {
+        console.log(`ℹ️ 引流方通知已跳过: ${referralNotifyResult.reason}`);
+      } else {
+        console.warn(`⚠️ 引流方通知失败: ${referralNotifyResult.reason}`);
       }
 
     } catch (postProcessError) {
@@ -870,7 +1130,7 @@ async function notifyThirdParty(order, payment) {
     
     if (!notifyUrl) {
       console.log('未配置第三方通知URL，跳过通知');
-      return;
+      return { status: 'skipped', reason: '未配置第三方通知URL' };
     }
     
     const notifyData = {
@@ -892,10 +1152,12 @@ async function notifyThirdParty(order, payment) {
     });
     
     console.log('第三方通知成功:', response.data);
+    return { status: 'success', data: response.data };
     
   } catch (err) {
     console.error('通知第三方失败:', err.message);
     // 通知失败不影响主流程，只记录日志
+    return { status: 'failed', reason: err.message };
   }
 }
 
@@ -913,7 +1175,7 @@ async function notifyReferralPartner(order, payment) {
 
     if (referralOrders.length === 0) {
       console.log('非引流订单，跳过引流方通知');
-      return;
+      return { status: 'skipped', reason: '非引流订单' };
     }
 
     const referralOrder = referralOrders[0];
@@ -944,10 +1206,12 @@ async function notifyReferralPartner(order, payment) {
     console.log('通知引流方数据:', notifyData);
 
     // 调用带重试机制的通知函数
-    await notifyWithRetry(referralOrder, notifyData);
+    const retryResult = await notifyWithRetry(referralOrder, notifyData);
+    return { status: 'success', data: retryResult };
 
   } catch (error) {
     console.error('引流方通知流程失败:', error.message);
+    return { status: 'failed', reason: error.message };
   }
 }
 

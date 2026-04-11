@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>支付完成</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; margin: 0; padding: 24px; color: #111; }
+      .card { max-width: 520px; margin: 0 auto; border: 1px solid #eee; border-radius: 12px; padding: 18px; }
+      h1 { font-size: 18px; margin: 0 0 8px; }
+      p { margin: 6px 0; color: #555; line-height: 1.5; }
+      .btn { display: inline-block; margin-top: 14px; padding: 10px 14px; border-radius: 10px; border: 1px solid #111; background: #111; color: #fff; text-decoration: none; }
+      .muted { color: #888; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>支付已完成</h1>
+      <p id="status">正在返回小程序…</p>
+      <a class="btn" href="javascript:void(0)" id="btn">返回订单详情</a>
+      <p class="muted">如未自动跳转，请点击按钮返回小程序。</p>
+    </div>
+
+    <script>
+      (function () {
+        var params = new URLSearchParams(location.search);
+        var orderId = params.get('param') || '';
+        var outTradeNo = params.get('out_trade_no') || '';
+
+        function targetUrl() {
+          if (orderId) return '/pages/order/detail/detail?id=' + encodeURIComponent(orderId);
+          return '/pages/order/list/list?paymentNo=' + encodeURIComponent(outTradeNo);
+        }
+
+        function go() {
+          var url = targetUrl();
+          if (window.wx && wx.miniProgram && typeof wx.miniProgram.redirectTo === 'function') {
+            wx.miniProgram.redirectTo({ url: url });
+            return;
+          }
+          document.getElementById('status').textContent = '当前页面不在小程序内，请返回小程序查看订单。';
+        }
+
+        document.getElementById('btn').addEventListener('click', go);
+        setTimeout(go, 200);
+      })();
+    </script>
+  </body>
+</html>
